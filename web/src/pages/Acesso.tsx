@@ -10,12 +10,12 @@ function Moldura({ titulo, subtitulo, children }: { titulo: string; subtitulo?: 
     <div className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-primaria font-display text-sm font-bold text-superficie" aria-hidden>RH</div>
+          <img src="/logo.png" alt="Óticas Idealize" width={600} height={182} className="mb-6 h-auto w-52 select-none" draggable={false} />
           <h1 className="text-2xl font-semibold">{titulo}</h1>
           {subtitulo && <p className="mt-2 text-sm text-texto-suave">{subtitulo}</p>}
         </div>
         <div className="rounded-xl border border-borda bg-superficie p-6">{children}</div>
-        <p className="mt-6 text-center text-xs text-texto-suave">Idealize RH 360º · Óticas Idealize</p>
+        <p className="mt-6 text-center text-xs text-texto-suave">Idealize RH 360º · Gestão de Pessoas & Departamento Pessoal</p>
       </div>
     </div>
   );
@@ -46,7 +46,7 @@ export function Login() {
   }
 
   return (
-    <Moldura titulo="Entrar" subtitulo="Gestão de Pessoas & Departamento Pessoal">
+    <Moldura titulo="Idealize RH 360º" subtitulo="Entre com seu e-mail e senha">
       <form onSubmit={entrar} className="flex flex-col gap-4" noValidate>
         <Campo rotulo="E-mail" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} obrigatorio />
         <Campo rotulo="Senha" type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} obrigatorio />

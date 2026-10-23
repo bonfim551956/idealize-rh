@@ -38,12 +38,9 @@ export function AppLayout() {
   );
 
   const marca = (
-    <div className="flex items-center gap-2 px-3">
-      <div className="flex size-8 items-center justify-center rounded-lg bg-primaria font-display text-xs font-bold text-superficie" aria-hidden>RH</div>
-      <div className="leading-tight">
-        <p className="font-display text-sm font-semibold">Idealize RH 360º</p>
-        <p className="text-xs text-texto-suave">Óticas Idealize</p>
-      </div>
+    <div className="flex flex-col gap-1 px-3">
+      <img src="/logo.png" alt="Óticas Idealize" width={600} height={182} className="h-auto w-36 select-none" draggable={false} />
+      <p className="font-display text-xs font-semibold tracking-wide text-primaria">RH 360º · Gestão de Pessoas</p>
     </div>
   );
 
@@ -60,7 +57,7 @@ export function AppLayout() {
     <div className="min-h-dvh lg:flex">
       {/* Barra superior (celular) */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-borda bg-superficie px-4 lg:hidden">
-        {marca}
+        <img src="/logo.png" alt="Óticas Idealize" width={600} height={182} className="h-8 w-auto select-none" draggable={false} />
         <button onClick={() => setMenuAberto(true)} className="rounded-lg p-2 hover:bg-fundo" aria-label="Abrir menu"><Menu className="size-5" /></button>
       </header>
 
