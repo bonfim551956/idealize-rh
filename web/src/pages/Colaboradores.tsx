@@ -154,7 +154,7 @@ export function NovoColaborador() {
             <Campo rotulo="CPF" inputMode="numeric" value={mascaraCpf(f.cpf)} onChange={set("cpf")} erro={erros.cpf} obrigatorio />
             <Campo rotulo="Data de nascimento" type="date" value={f.data_nascimento} onChange={set("data_nascimento")} max={hoje()} />
             <Campo rotulo="Celular" inputMode="tel" value={mascaraTelefone(f.telefone)} onChange={set("telefone")} />
-            <Campo rotulo="E-mail" type="email" value={f.email} onChange={set("email")} className="sm:col-span-2" />
+            <Campo rotulo="E-mail" type="email" value={f.email} onChange={set("email")} className="sm:col-span-2 [&_input]:uppercase" />
           </div>
           <p className="mt-3 text-xs text-texto-suave">Endereço e contato de emergência podem ser preenchidos depois, na ficha do colaborador.</p>
         </Cartao>

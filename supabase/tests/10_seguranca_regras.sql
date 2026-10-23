@@ -60,7 +60,7 @@ select teste.nega($$select privado.bootstrap_diretoria('dp@teste.local')$$, 'boo
 insert into teste.ctx values
   ('soro',  (select id::text from public.lojas where codigo = 'SOROCABA')),
   ('camp',  (select id::text from public.lojas where codigo = 'CAMPINAS')),
-  ('cargo', (select id::text from public.cargos where nome = 'Consultor(a) de vendas')),
+  ('cargo', (select id::text from public.cargos where nome = 'CONSULTOR(A) DE VENDAS')),
   ('cat_saude', (select id::text from public.doc_categorias where codigo = 'exames_ocupacionais')),
   ('cat_geral', (select id::text from public.doc_categorias where codigo = 'treinamentos')),
   ('u_dp',  (select id::text from public.usuarios where email = 'dp@teste.local')),
@@ -235,7 +235,7 @@ select teste.nega($$select public.alterar_status_vinculo(teste.id('vinc_a'), 'de
 select teste.nega($$select public.alterar_status_vinculo(teste.id('vinc_a'), 'em_ferias', '')$$, 'mudança de status exige motivo');
 select public.alterar_status_vinculo(teste.id('vinc_a'), 'em_ferias', 'Férias 2026');
 select public.alterar_status_vinculo(teste.id('vinc_a'), 'ativo', 'Retorno de férias');
-select public.alterar_cargo(teste.id('vinc_a'), (select id from public.cargos where nome = 'Gerente de loja'), date '2026-10-15', 'promocao', 'Promoção');
+select public.alterar_cargo(teste.id('vinc_a'), (select id from public.cargos where nome = 'GERENTE DE LOJA'), date '2026-10-15', 'promocao', 'Promoção');
 select teste.ok((select count(*) from public.historico_cargos where vinculo_id = teste.id('vinc_a')) = 2, 'promoção gera histórico de cargos');
 
 do $$ begin

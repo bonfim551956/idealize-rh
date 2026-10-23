@@ -157,6 +157,7 @@ const SECOES: Secao[] = [
           <>Faixa <span className="text-perigo">vermelha</span>: algo não foi salvo — leia a mensagem, ela diz o motivo (ex.: “Informe o motivo”).</>,
           <>“Você não tem permissão para esta ação”: o seu perfil não cobre aquilo. Fale com quem administra os acessos.</>,
           <>Campos com <span className="text-perigo">*</span> são obrigatórios.</>,
+          <><B>Tudo o que você digita é gravado em LETRA MAIÚSCULA</B> (nomes, endereços, motivos, observações). Pode digitar normalmente: o sistema converte sozinho. A única exceção é o e-mail de login.</>,
         ]} />
         <Dica>O sistema guarda tudo na nuvem: atualizar a página ou trocar de computador não perde nada que já foi salvo.</Dica>
       </>

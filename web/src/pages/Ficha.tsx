@@ -431,7 +431,7 @@ function EditarPessoais({ c, dados, fechar }: { c: ColaboradorLinha; dados: Pess
         <Campo rotulo="CPF" value={mascaraCpf(f.cpf ?? "")} onChange={set("cpf")} obrigatorio />
         <Campo rotulo="Nascimento" type="date" value={f.data_nascimento ?? ""} onChange={set("data_nascimento")} max={hoje()} />
         <Campo rotulo="Celular" value={mascaraTelefone(f.telefone ?? "")} onChange={set("telefone")} />
-        <Campo rotulo="E-mail" type="email" value={f.email ?? ""} onChange={set("email")} className="sm:col-span-2" />
+        <Campo rotulo="E-mail" type="email" value={f.email ?? ""} onChange={set("email")} className="sm:col-span-2 [&_input]:uppercase" />
         <Campo rotulo="CEP" value={f.cep ?? ""} onChange={set("cep")} onBlur={buscarCep} dica={buscandoCep ? "Buscando endereço…" : "Preenche o endereço automaticamente"} />
         <Campo rotulo="Logradouro" value={f.logradouro ?? ""} onChange={set("logradouro")} />
         <Campo rotulo="Número" value={f.numero ?? ""} onChange={set("numero")} />

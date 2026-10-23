@@ -61,7 +61,10 @@ export const Campo = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <div className={className}>
         <Rotulo id={i} rotulo={rotulo} obrigatorio={obrigatorio} />
         <input ref={ref} id={i} required={obrigatorio} aria-invalid={!!erro} aria-describedby={erro || dica ? `${i}-msg` : undefined}
-          className={cx(baseCampo, "h-10", erro ? "border-perigo" : "border-borda")} {...p} />
+          className={cx(baseCampo, "h-10", erro ? "border-perigo" : "border-borda",
+            // REGRA DE OURO: texto digitado aparece em MAIÚSCULAS (o banco grava em maiúsculas).
+            // Exceções: e-mail de login, senha e campos não textuais.
+            (!p.type || ["text", "search", "tel"].includes(p.type)) && "uppercase")} {...p} />
         <Rodape id={i} erro={erro} dica={dica} />
       </div>
     );
@@ -87,7 +90,7 @@ export function AreaTexto({ rotulo, erro, dica, obrigatorio, id, className, ...p
     <div className={className}>
       <Rotulo id={i} rotulo={rotulo} obrigatorio={obrigatorio} />
       <textarea id={i} required={obrigatorio} rows={3}
-        className={cx(baseCampo, "py-2", erro ? "border-perigo" : "border-borda")} {...p} />
+        className={cx(baseCampo, "py-2 uppercase", erro ? "border-perigo" : "border-borda")} {...p} />
       <Rodape id={i} erro={erro} dica={dica} />
     </div>
   );
