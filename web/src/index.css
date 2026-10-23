@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Tokens de marca — ajuste aqui cores e fontes sem mexer nos componentes.
+   Contraste conferido (WCAG AA): primária #0E7474 com texto #FAFAFA = 5.34:1 */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-marca: #189c9c;          /* teal oficial — só decorativo */
+  --color-primaria: #0e7474;       /* botões e links */
+  --color-primaria-escura: #0b5c5c;
+  --color-primaria-suave: #e6f4f4;
+  --color-destaque: #f59e3c;       /* laranja oficial — fundo de destaque com texto escuro */
+
+  --color-fundo: #f5f5f5;
+  --color-superficie: #fafafa;
+  --color-borda: #e2e2e2;
+  --color-texto: #1a1a1a;
+  --color-texto-suave: #5c5c5c;
+
+  --color-sucesso: #0f6b3a;
+  --color-sucesso-suave: #ecfdf3;
+  --color-alerta: #8a5a00;
+  --color-alerta-suave: #fff8e6;
+  --color-perigo: #b42318;
+  --color-perigo-suave: #fef2f2;
+  --color-info: #1f4e9e;
+  --color-info-suave: #eef4ff;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  @apply bg-fundo text-texto font-sans antialiased;
+  font-size: 16px;
+  line-height: 1.5;
+}
+h1, h2, h3 { @apply font-display; line-height: 1.2; }
+
+:focus-visible { outline: 2px solid var(--color-marca); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
