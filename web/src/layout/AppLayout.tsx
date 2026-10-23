@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, FileText, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Store, UserCog, Users, X } from "lucide-react";
+import { BookOpen, FileText, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Shirt, Store, UserCog, Users, X } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { cx } from "../ui/componentes";
 
@@ -17,6 +17,7 @@ export function AppLayout() {
     { para: "/", rotulo: "Painel", icone: LayoutDashboard, visivel: pode("dashboard.ver") || pode("colaborador.ler") },
     { para: "/colaboradores", rotulo: "Colaboradores", icone: Users, visivel: pode("colaborador.ler") },
     { para: "/documentos", rotulo: "Documentos", icone: FileText, visivel: leDocumentos },
+    { para: "/uniformes", rotulo: "Uniformes", icone: Shirt, visivel: pode("uniforme.ler") },
     { para: "/lojas", rotulo: "Lojas e estrutura", icone: Store, visivel: pode("config.estrutura.gerir") },
     { para: "/acessos", rotulo: "Usuários e acessos", icone: UserCog, visivel: pode("acesso.gerir") },
     { para: "/auditoria", rotulo: "Auditoria", icone: ScrollText, visivel: pode("auditoria.ler") },

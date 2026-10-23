@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   Archive, BookOpen, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, LayoutDashboard, Lock, Printer, ScrollText,
-  Search, ShieldCheck, Sparkles, Store, UserCog, UserMinus, UserPlus, Users, Wallet, type LucideIcon,
+  Search, ShieldCheck, Shirt, Sparkles, Store, UserCog, UserMinus, UserPlus, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { useLojas } from "../lib/dados";
@@ -29,7 +29,7 @@ type Secao = {
   id: string;
   titulo: string;
   icone: LucideIcon;
-  grupo: "Começando" | "Pessoas" | "Documentos" | "Administração" | "Referência";
+  grupo: "Começando" | "Pessoas" | "Documentos" | "Uniformes" | "Administração" | "Referência";
   palavras: string;
   mostrar: (c: Ctx) => boolean;
   conteudo: (c: Ctx) => ReactNode;
@@ -145,6 +145,7 @@ const SECOES: Secao[] = [
           (c.pode("dashboard.ver") || c.pode("colaborador.ler")) && <><B>Painel</B> — indicadores reais das suas lojas.</>,
           c.pode("colaborador.ler") && <><B>Colaboradores</B> — lista, cadastro e ficha de cada profissional.</>,
           c.leAlgumDoc && <><B>Documentos</B> — todos os documentos que você pode ver, com filtros.</>,
+          c.pode("uniforme.ler") && <><B>Uniformes</B> — estoque central, entregas aos colaboradores e pedido de compra.</>,
           c.pode("config.estrutura.gerir") && <><B>Lojas e estrutura</B> — unidades e cargos.</>,
           c.pode("acesso.gerir") && <><B>Usuários e acessos</B> — convites e perfis.</>,
           c.pode("auditoria.ler") && <><B>Auditoria</B> — registro de tudo o que foi feito.</>,
@@ -506,6 +507,52 @@ const SECOES: Secao[] = [
     ),
   },
 
+  /* ---------------- Uniformes ---------------- */
+  {
+    id: "uniformes", titulo: "Controle de uniformes", icone: Shirt, grupo: "Uniformes",
+    palavras: "uniforme estoque camisa polo social camiseta tamanho entrega entregar devolução devolver pedido compra mínimo inventário contagem baixa estorno",
+    mostrar: (c) => c.pode("uniforme.ler"),
+    conteudo: (c) => (
+      <>
+        <P>O estoque de uniformes é <B>central</B> (um só para a rede). Cada peça em cada tamanho tem o seu saldo e o seu <B>estoque mínimo</B> (começa em 12). O saldo nunca é digitado: o sistema calcula a partir das entradas e saídas registradas.</P>
+        <T>O que cada aba mostra</T>
+        <Lista itens={[
+          <><Menu>Estoque</Menu>: quanto há de cada peça, o mínimo, quanto falta e quantas estão com colaboradores.</>,
+          <><Menu>Pedido de compra</Menu>: o que pedir para voltar ao mínimo (mínimo − estoque). Use <B>Copiar lista</B> para mandar ao fornecedor ou <B>Imprimir</B>.</>,
+          <><Menu>Com colaboradores</Menu>: quem está com quais peças agora.</>,
+          <><Menu>Movimentações</Menu>: tudo o que entrou e saiu, com data e quem registrou.</>,
+        ]} />
+        {c.pode("uniforme.movimentar") && <>
+          <T>Entregar uniforme ao colaborador</T>
+          <Passos itens={[
+            <>Clique em <Menu>Entregar ao colaborador</Menu> (ou abra a ficha da pessoa, aba <Menu>Uniformes</Menu>, e clique em <Menu>Entregar</Menu>).</>,
+            <>Escolha o colaborador, a peça e tamanho e a quantidade. Use <B>Adicionar outra peça</B> para entregar um kit de uma vez.</>,
+            <>Confira a data e clique em <Menu>Registrar entrega</Menu>. A entrega aparece na ficha e na linha do tempo do colaborador.</>,
+          ]} />
+          <T>Outras movimentações</T>
+          <Quadro cabecalho={["Situação", "O que usar"]} linhas={[
+            ["Chegou pedido do fornecedor", <><Menu>Registrar entrada</Menu> (pode lançar várias peças juntas; anote fornecedor ou nota na observação)</>],
+            ["Colaborador devolveu (ex.: desligamento, troca de tamanho)", <><Menu>Devolução</Menu>. Só aparecem as peças que ele tem em mãos; elas voltam ao estoque</>],
+            ["Peça rasgada, perdida ou descartada", <>Ícone de <B>lixeira</B> na linha da peça (baixa). Motivo obrigatório</>],
+            ["Contei o estoque e não bate", <>Ícone de <B>prancheta</B> (inventário). Informe quanto contou; o sistema lança só a diferença</>],
+            ["Lancei errado", <>Em <Menu>Movimentações</Menu>, ícone de <B>seta circular</B> (estorno). O lançamento não é apagado: fica o original e o estorno</>],
+          ]} />
+          <Dica>Troca de tamanho = <B>Devolução</B> do tamanho antigo + <B>Entrega</B> do novo.</Dica>
+          <Atencao>O sistema não deixa entregar mais do que há em estoque nem registrar devolução de peças que o colaborador não tem.</Atencao>
+        </>}
+        {c.pode("uniforme.gerir") && <>
+          <T>Cadastrar peças e ajustar o mínimo</T>
+          <Lista itens={[
+            <>Em <Menu>Estoque</Menu>, clique em <Menu>Nova peça / tamanho</Menu>. Cada tamanho é um item separado (ex.: POLO FEMININO P e POLO FEMININO M).</>,
+            <>Para mudar o estoque mínimo, clique no <B>lápis</B> da peça. O pedido de compra se ajusta na hora.</>,
+            <>Peça que não será mais usada: desmarque <B>Peça ativa</B>. Ela sai do pedido de compra, mas o histórico fica.</>,
+            <>Depois de cadastrar uma peça, lance o saldo existente com <Menu>Registrar entrada</Menu>.</>,
+          ]} />
+        </>}
+      </>
+    ),
+  },
+
   /* ---------------- Administração ---------------- */
   {
     id: "lojas", titulo: "Lojas e cargos", icone: Store, grupo: "Administração",
@@ -638,7 +685,7 @@ const SECOES: Secao[] = [
       <Lista itens={[
         <><B>Departamento Pessoal:</B> fluxo de admissão com checklist, contratos e prazos (experiência), férias com períodos aquisitivos, afastamentos, espelhos de ponto com fechamento mensal, desligamento com checklist completo, central de tarefas e alertas.</>,
         <><B>Conformidade:</B> obrigações trabalhistas, modelos de documentos, política de retenção, assinatura eletrônica.</>,
-        <><B>Gestão de pessoas:</B> recrutamento, treinamentos, avaliações, comunicados com ciência, controle de uniformes e equipamentos.</>,
+        <><B>Gestão de pessoas:</B> recrutamento, treinamentos, avaliações, comunicados com ciência, controle de equipamentos.</>,
         <><B>Portal do colaborador:</B> cada profissional consultando os próprios dados e documentos.</>,
       ]} />
     ),
@@ -691,7 +738,7 @@ function SeuAcesso() {
 /* =====================================================================
    Página
    ===================================================================== */
-const GRUPOS: Secao["grupo"][] = ["Começando", "Pessoas", "Documentos", "Administração", "Referência"];
+const GRUPOS: Secao["grupo"][] = ["Começando", "Pessoas", "Documentos", "Uniformes", "Administração", "Referência"];
 
 export function Manual() {
   const { pode, permissoes } = useAuth();

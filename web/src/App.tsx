@@ -10,6 +10,7 @@ import { Ficha } from "./pages/Ficha";
 import { PaginaDocumentos } from "./pages/Documentos";
 import { Acessos, Auditoria, Conta, Lojas } from "./pages/Admin";
 import { Manual } from "./pages/Manual";
+import { Uniformes } from "./pages/Uniformes";
 
 /** Exige login (e MFA quando o perfil pede). */
 function Protegida({ children }: { children: ReactNode }) {
@@ -48,6 +49,7 @@ export function App() {
         <Route path="colaboradores/novo" element={<Requer perm="colaborador.criar"><NovoColaborador /></Requer>} />
         <Route path="colaboradores/:id" element={<Requer perm="colaborador.ler"><Ficha /></Requer>} />
         <Route path="documentos" element={<Requer perm={leDocs}><PaginaDocumentos /></Requer>} />
+        <Route path="uniformes" element={<Requer perm="uniforme.ler"><Uniformes /></Requer>} />
         <Route path="lojas" element={<Requer perm="config.estrutura.gerir"><Lojas /></Requer>} />
         <Route path="acessos" element={<Requer perm="acesso.gerir"><Acessos /></Requer>} />
         <Route path="auditoria" element={<Requer perm="auditoria.ler"><Auditoria /></Requer>} />

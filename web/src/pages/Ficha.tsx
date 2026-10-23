@@ -9,6 +9,7 @@ import { SIGILO, STATUS_VINCULO, TIPOS_VINCULO, data, dataHora, hoje, mascaraCpf
 import { useAuth } from "../auth/AuthProvider";
 import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, cx, useAvisos } from "../ui/componentes";
 import { ListaDocumentos } from "./Documentos";
+import { UniformesColaborador } from "./Uniformes";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
 
@@ -32,6 +33,7 @@ export function Ficha() {
     { valor: "pessoais", rotulo: "Dados pessoais", visivel: pode("colaborador.dados_pessoais.ler", loja), conteudo: <DadosPessoais c={c} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
+    { valor: "uniformes", rotulo: "Uniformes", visivel: pode("uniforme.ler"), conteudo: <UniformesColaborador c={c} /> },
     { valor: "timeline", rotulo: "Linha do tempo", visivel: true, conteudo: <LinhaDoTempo c={c} /> },
   ];
 
