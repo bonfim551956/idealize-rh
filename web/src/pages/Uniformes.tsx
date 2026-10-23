@@ -74,10 +74,11 @@ type Acao =
   | null;
 
 export function Uniformes() {
-  const { pode } = useAuth();
+  const { pode, lojasCom } = useAuth();
   const estoque = useEstoque();
   const [acao, setAcao] = useState<Acao>(null);
-  const movimenta = pode("uniforme.movimentar");
+  const entrega = pode("uniforme.movimentar");                                          // entrega/devolução (em alguma loja)
+  const movimenta = entrega && lojasCom("uniforme.movimentar") === null;                // estoque central: todas as lojas
   const gere = pode("uniforme.gerir");
 
   const itens = useMemo(() => ordenar(estoque.data ?? []), [estoque.data]);
@@ -92,9 +93,9 @@ export function Uniformes() {
   return (
     <>
       <CabecalhoPagina titulo="Uniformes" descricao="Estoque central. O saldo é calculado pelas entradas e saídas registradas, e cada entrega fica na ficha do colaborador."
-        acoes={movimenta && <>
+        acoes={entrega && <>
           <Botao icone={<ArrowUpFromLine className="size-4" />} onClick={() => setAcao({ tipo: "saida" })}>Entregar ao colaborador</Botao>
-          <Botao variante="secundaria" icone={<ArrowDownToLine className="size-4" />} onClick={() => setAcao({ tipo: "entrada" })}>Registrar entrada</Botao>
+          {movimenta && <Botao variante="secundaria" icone={<ArrowDownToLine className="size-4" />} onClick={() => setAcao({ tipo: "entrada" })}>Registrar entrada</Botao>}
           <Botao variante="secundaria" icone={<Undo2 className="size-4" />} onClick={() => setAcao({ tipo: "devolucao" })}>Devolução</Botao>
         </>} />
 
@@ -511,17 +512,18 @@ function EstornoModal({ mov, fechar }: { mov: Movimento; fechar: () => void }) {
 
 /* ---------------- Aba na ficha do colaborador ---------------- */
 export function UniformesColaborador({ c }: { c: ColaboradorLinha }) {
-  const { pode } = useAuth();
+  const { pode, lojasCom } = useAuth();
   const posse = usePosse(c.id);
   const estoque = useEstoque();
   const [acao, setAcao] = useState<Acao>(null);
-  const movimenta = pode("uniforme.movimentar");
+  const entrega = pode("uniforme.movimentar", c.loja_atual_id);
+  const movimenta = entrega && lojasCom("uniforme.movimentar") === null;
   const encerrado = c.status === "desligado" || c.status === "arquivado";
   const total = (posse.data ?? []).reduce((s, p) => s + p.quantidade, 0);
   return (
     <div className="flex flex-col gap-6">
       <Cartao titulo={<span className="flex items-center gap-2"><Shirt className="size-4" /> Em mãos agora{total ? ` (${total})` : ""}</span>}
-        acao={movimenta && <div className="flex gap-2">
+        acao={entrega && <div className="flex gap-2">
           {!encerrado && <Botao tamanho="sm" icone={<ArrowUpFromLine className="size-4" />} onClick={() => setAcao({ tipo: "saida" })}>Entregar</Botao>}
           {total > 0 && <Botao tamanho="sm" variante="secundaria" icone={<Undo2 className="size-4" />} onClick={() => setAcao({ tipo: "devolucao" })}>Devolução</Botao>}
         </div>}>

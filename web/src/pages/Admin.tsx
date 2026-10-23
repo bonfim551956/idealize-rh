@@ -232,7 +232,7 @@ function Conceder({ usuario, perfis, fechar }: { usuario: Usuario; perfis: Perfi
   const avisar = useAvisos();
   const [f, setF] = useState({ perfil: "", loja: "", motivo: "", validade: "" });
   const perfil = perfis.find((p) => p.codigo === f.perfil);
-  const exigeLoja = f.perfil === "gerente_loja";
+  const exigeLoja = f.perfil === "gerente_loja" || f.perfil === "supervisor";
   const m = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc("conceder_acesso", {
@@ -253,7 +253,7 @@ function Conceder({ usuario, perfis, fechar }: { usuario: Usuario; perfis: Perfi
         </Selecao>
         {perfil?.descricao && <Aviso>{perfil.descricao}</Aviso>}
         <Selecao rotulo="Escopo" value={f.loja} onChange={(e) => setF({ ...f, loja: e.target.value })} obrigatorio={exigeLoja}
-          dica={exigeLoja ? "Gerente sempre fica restrito a uma loja." : "Deixe “Todas as lojas” só para quem realmente precisa."}>
+          dica={exigeLoja ? (f.perfil === "supervisor" ? "Supervisor: conceda uma vez para cada loja que ele acompanha." : "Gerente sempre fica restrito a uma loja.") : "Deixe “Todas as lojas” só para quem realmente precisa."}>
           {!exigeLoja && <option value="">Todas as lojas</option>}
           {exigeLoja && <option value="">Selecione</option>}
           {lojas.data?.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
