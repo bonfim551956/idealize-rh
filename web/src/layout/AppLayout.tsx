@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { FileText, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Store, UserCog, Users, X } from "lucide-react";
+import { BookOpen, FileText, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Store, UserCog, Users, X } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { cx } from "../ui/componentes";
 
@@ -21,6 +21,7 @@ export function AppLayout() {
     { para: "/acessos", rotulo: "Usuários e acessos", icone: UserCog, visivel: pode("acesso.gerir") },
     { para: "/auditoria", rotulo: "Auditoria", icone: ScrollText, visivel: pode("auditoria.ler") },
     { para: "/conta", rotulo: "Minha conta", icone: ShieldCheck, visivel: true },
+    { para: "/manual", rotulo: "Manual", icone: BookOpen, visivel: true },
   ];
 
   const nav = (
@@ -56,13 +57,13 @@ export function AppLayout() {
   return (
     <div className="min-h-dvh lg:flex">
       {/* Barra superior (celular) */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-borda bg-superficie px-4 lg:hidden">
+      <header className="sticky top-0 z-30 flex h-14 print:hidden items-center justify-between border-b border-borda bg-superficie px-4 lg:hidden">
         <img src="/logo.png" alt="Óticas Idealize" width={600} height={182} className="h-8 w-auto select-none" draggable={false} />
         <button onClick={() => setMenuAberto(true)} className="rounded-lg p-2 hover:bg-fundo" aria-label="Abrir menu"><Menu className="size-5" /></button>
       </header>
 
       {/* Menu lateral (desktop) */}
-      <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-borda bg-superficie py-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
+      <aside className="hidden print:!hidden w-64 shrink-0 flex-col justify-between border-r border-borda bg-superficie py-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">
         <div className="flex flex-col gap-6">{marca}<div className="px-3">{nav}</div></div>
         {rodape}
       </aside>
@@ -86,7 +87,7 @@ export function AppLayout() {
         )}
       </AnimatePresence>
 
-      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8" key={local.pathname}>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:p-0" key={local.pathname}>
         <div className="mx-auto max-w-6xl"><Outlet /></div>
       </main>
     </div>

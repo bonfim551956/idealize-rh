@@ -78,7 +78,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
   const desligamento = useQuery({
     queryKey: ["desligamento", c.vinculo_id],
     enabled: c.status === "em_desligamento" && pode("desligamento.gerir", loja),
-    queryFn: async () => falhar(await supabase.from("desligamentos").select("id,modalidade,data_comunicacao,status").eq("vinculo_id", c.vinculo_id!).maybeSingle()) as
+    queryFn: async () => falhar(await supabase.from("desligamentos").select("id,modalidade,data_comunicacao,status").eq("vinculo_id", c.vinculo_id!).eq("status", "em_andamento").maybeSingle()) as
       { id: string; modalidade: string; data_comunicacao: string; status: string } | null,
   });
 
