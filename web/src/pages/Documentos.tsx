@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, CheckCircle2, Download, Eye, FilePlus2, RefreshCw, XCircle } from "lucide-react";
@@ -6,10 +6,9 @@ import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCategorias, useLojas, type ColaboradorLinha, type DocumentoLinha } from "../lib/dados";
 import { SIGILO, STATUS_DOCUMENTO, data, hoje } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
-import { AreaTexto, Aviso, Botao, CabecalhoPagina, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, useAvisos } from "../ui/componentes";
+import { AreaTexto, Aviso, Botao, CabecalhoPagina, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, useAvisos } from "../ui/componentes";
+import { EnvioDocumento } from "./EnvioDocumentos";
 
-const TIPOS_ACEITOS = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-const LIMITE = 20 * 1024 * 1024;
 
 export function PaginaDocumentos() {
   return (
@@ -123,131 +122,6 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
       {conferindo && <Conferencia doc={conferindo} aoFechar={() => setConferindo(null)} aoConcluir={() => { setConferindo(null); recarregar(); }} />}
       {arquivando && <Arquivamento doc={arquivando} aoFechar={() => setArquivando(null)} aoConcluir={() => { setArquivando(null); recarregar(); }} />}
     </Cartao>
-  );
-}
-
-/* ---------------- Envio ---------------- */
-function EnvioDocumento({ aberto, documento, colaborador, aoFechar, aoConcluir }: {
-  aberto: boolean; documento?: DocumentoLinha; colaborador?: ColaboradorLinha; aoFechar: () => void; aoConcluir: () => void;
-}) {
-  const { pode } = useAuth();
-  const categorias = useCategorias();
-  const avisar = useAvisos();
-  const [arquivos, setArquivos] = useState<File[]>([]);
-  const [meta, setMeta] = useState({ categoria_id: "", nome: "", data_emissao: "", competencia: "", vencimento: "", colaborador_id: "" });
-  const [motivo, setMotivo] = useState("");
-  const [busca, setBusca] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
-
-  const colaboradores = useQuery({
-    queryKey: ["colaboradores-envio"],
-    enabled: aberto && !colaborador && !documento,
-    queryFn: async () => falhar(await supabase.from("v_colaboradores").select("id,nome_completo,loja_atual_id,loja_nome")
-      .not("status", "in", "(arquivado)").order("nome_completo").limit(1000)) as Pick<ColaboradorLinha, "id" | "nome_completo" | "loja_atual_id" | "loja_nome">[],
-  });
-
-  const colabSel = colaborador ?? colaboradores.data?.find((c) => c.id === meta.colaborador_id);
-  const lojaAlvo = documento?.loja_id ?? colabSel?.loja_atual_id;
-  const categoriasPermitidas = (categorias.data ?? []).filter((c) => lojaAlvo && pode(`documento.${c.nivel_sigilo}.enviar`, lojaAlvo));
-  const cat = categorias.data?.find((c) => c.id === meta.categoria_id);
-  const listaColab = useMemo(() => (colaboradores.data ?? []).filter((c) =>
-    c.nome_completo.toLowerCase().includes(busca.toLowerCase())).slice(0, 50), [colaboradores.data, busca]);
-
-  const enviar = useMutation({
-    mutationFn: async () => {
-      for (const a of arquivos) {
-        const fd = new FormData();
-        fd.append("arquivo", a);
-        if (documento) {
-          fd.append("documento_id", documento.id);
-          fd.append("motivo", motivo);
-        } else {
-          fd.append("meta", JSON.stringify({
-            ...meta, colaborador_id: colabSel?.id, nome: arquivos.length > 1 ? `${meta.nome || cat?.nome} — ${a.name}` : (meta.nome || a.name),
-          }));
-        }
-        await chamarFuncao("documentos-upload", fd, false);
-      }
-    },
-    onSuccess: () => { avisar("sucesso", arquivos.length > 1 ? `${arquivos.length} documentos enviados.` : "Documento enviado. Agora ele precisa ser conferido."); limpar(); aoConcluir(); },
-    onError: (e) => setErro(mensagemErro(e)),
-  });
-
-  function limpar() {
-    setArquivos([]); setMotivo(""); setErro(null); setBusca("");
-    setMeta({ categoria_id: "", nome: "", data_emissao: "", competencia: "", vencimento: "", colaborador_id: "" });
-  }
-
-  function escolher(lista: FileList | null) {
-    setErro(null);
-    const fs = Array.from(lista ?? []);
-    const invalido = fs.find((a) => !TIPOS_ACEITOS.includes(a.type) || a.size > LIMITE || a.size === 0);
-    if (invalido) { setErro(`"${invalido.name}": use PDF, JPG, PNG ou WEBP de até 20 MB.`); return; }
-    setArquivos(documento ? fs.slice(0, 1) : fs.slice(0, 10));
-  }
-
-  function submeter(e: FormEvent) {
-    e.preventDefault();
-    if (!arquivos.length) return setErro("Escolha o arquivo.");
-    if (documento && !motivo.trim()) return setErro("Informe o motivo da substituição.");
-    if (!documento) {
-      if (!colabSel) return setErro("Escolha o colaborador.");
-      if (!meta.categoria_id) return setErro("Escolha a categoria.");
-      if (cat?.exige_competencia && !meta.competencia) return setErro("Esta categoria exige a competência (mês).");
-      if (cat?.exige_vencimento && !meta.vencimento) return setErro("Esta categoria exige a data de vencimento.");
-    }
-    enviar.mutate();
-  }
-
-  return (
-    <Modal aberto={aberto} aoFechar={() => { limpar(); aoFechar(); }}
-      titulo={documento ? "Enviar nova versão" : "Enviar documento"}
-      descricao={documento ? documento.nome : "O documento entra como “Recebido” e só vale depois de conferido."}>
-      <form onSubmit={submeter} className="flex flex-col gap-4">
-        {!documento && !colaborador && (
-          <div>
-            <Campo rotulo="Colaborador" placeholder="Digite para buscar" value={busca} onChange={(e) => { setBusca(e.target.value); setMeta((m) => ({ ...m, colaborador_id: "", categoria_id: "" })); }} obrigatorio />
-            {busca && !colabSel && (
-              <ul className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-borda">
-                {listaColab.map((c) => (
-                  <li key={c.id}><button type="button" className="w-full px-3 py-2 text-left text-sm hover:bg-fundo"
-                    onClick={() => { setMeta((m) => ({ ...m, colaborador_id: c.id })); setBusca(c.nome_completo); }}>
-                    {c.nome_completo} <span className="text-texto-suave">· {c.loja_nome}</span></button></li>
-                ))}
-                {listaColab.length === 0 && <li className="px-3 py-2 text-sm text-texto-suave">Ninguém encontrado</li>}
-              </ul>
-            )}
-          </div>
-        )}
-        {!documento && (
-          <>
-            <Selecao rotulo="Categoria" value={meta.categoria_id} onChange={(e) => setMeta((m) => ({ ...m, categoria_id: e.target.value }))} obrigatorio
-              disabled={!lojaAlvo} dica={!lojaAlvo ? "Escolha o colaborador primeiro" : undefined}>
-              <option value="">Selecione</option>
-              {categoriasPermitidas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </Selecao>
-            <Campo rotulo="Nome do documento" placeholder="Ex.: ASO admissional" value={meta.nome} onChange={(e) => setMeta((m) => ({ ...m, nome: e.target.value }))}
-              dica="Se ficar em branco, usa o nome do arquivo." />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Campo rotulo="Emissão" type="date" value={meta.data_emissao} onChange={(e) => setMeta((m) => ({ ...m, data_emissao: e.target.value }))} />
-              <Campo rotulo="Competência" type="month" value={meta.competencia.slice(0, 7)} onChange={(e) => setMeta((m) => ({ ...m, competencia: e.target.value ? `${e.target.value}-01` : "" }))} obrigatorio={cat?.exige_competencia} />
-              <Campo rotulo="Vencimento" type="date" value={meta.vencimento} onChange={(e) => setMeta((m) => ({ ...m, vencimento: e.target.value }))} obrigatorio={cat?.exige_vencimento} />
-            </div>
-          </>
-        )}
-        {documento && <AreaTexto rotulo="Motivo da substituição" value={motivo} onChange={(e) => setMotivo(e.target.value)} obrigatorio />}
-        <div>
-          <Campo rotulo={documento ? "Arquivo" : "Arquivo(s)"} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple={!documento}
-            onChange={(e) => escolher(e.target.files)} dica="PDF, JPG, PNG ou WEBP · até 20 MB cada" obrigatorio />
-          {arquivos.length > 1 && <p className="mt-1 text-xs text-texto-suave">{arquivos.length} arquivos — cada um vira um documento.</p>}
-        </div>
-        {erro && <Aviso tom="perigo">{erro}</Aviso>}
-        <div className="flex justify-end gap-2">
-          <Botao type="button" variante="secundaria" onClick={() => { limpar(); aoFechar(); }}>Cancelar</Botao>
-          <Botao type="submit" carregando={enviar.isPending}>Enviar</Botao>
-        </div>
-      </form>
-    </Modal>
   );
 }
 

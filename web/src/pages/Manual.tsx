@@ -442,25 +442,27 @@ const SECOES: Secao[] = [
   },
   {
     id: "enviar", titulo: "Enviar documentos e novas versões", icone: FileText, grupo: "Documentos",
-    palavras: "enviar upload anexar documento arquivo pdf foto nova versão substituir competência vencimento",
+    palavras: "enviar upload anexar documento arquivo pdf foto nova versão substituir competência vencimento ia inteligência artificial leitura automática classificar",
     mostrar: (c) => c.enviaAlgumDoc,
     conteudo: (c) => (
       <>
         <Passos itens={[
           <>Clique em <Menu>Enviar documento</Menu> (na página Documentos ou na aba Documentos da ficha).</>,
-          <>Na página Documentos, busque e escolha o colaborador. (Na ficha ele já vem escolhido.)</>,
-          <>Escolha a <B>categoria</B> — só aparecem as que você pode enviar para a loja daquele colaborador.</>,
-          <>Dê um nome claro (ex.: “ASO admissional”, “Holerite setembro/2026”). Em branco, usa o nome do arquivo.</>,
-          <>Preencha <B>competência</B> (mês de referência) e <B>vencimento</B> quando a categoria pedir.</>,
-          <>Escolha o(s) arquivo(s) e clique em <Menu>Enviar</Menu>.</>,
+          <>Arraste os arquivos para a área tracejada ou clique nela para escolher. Pode mandar <B>vários de uma vez</B> (até 30) — inclusive de colaboradores diferentes.</>,
+          <>Com a <B>Leitura automática com IA</B> ligada, o sistema lê cada arquivo e preenche sozinho: <B>colaborador</B> (pelo CPF ou nome escrito no documento), <B>categoria</B>, <B>nome</B>, <B>emissão</B>, <B>competência</B> e <B>vencimento</B>.</>,
+          <><B>Confira cada cartão.</B> O selo mostra a confiança da leitura: <Selo tom="sucesso">alta</Selo> <Selo tom="alerta">média</Selo> <Selo tom="perigo">baixa</Selo>. Corrija o que estiver errado — todos os campos são editáveis.</>,
+          <>Cartão com aviso vermelho precisa de ajuste (ex.: colaborador não encontrado, categoria que exige competência). Quando tudo estiver certo, clique em <Menu>Enviar documentos</Menu>.</>,
         ]} />
+        <Atencao>A IA <B>sugere</B>, quem envia <B>confirma</B>. Ela pode errar, principalmente em fotos ruins. E o documento enviado continua precisando de <B>conferência</B> para valer.</Atencao>
+        <Dica>Na ficha de um colaborador, todos os arquivos vão para ele. Se a IA perceber que o documento é de <B>outra pessoa</B>, o cartão mostra um alerta — confira antes de enviar.</Dica>
         <Quadro cabecalho={["Regra", "Detalhe"]} linhas={[
           ["Formatos", "PDF, JPG, PNG ou WEBP. O sistema confere o conteúdo real do arquivo, não só a extensão."],
           ["Tamanho", "Até 20 MB por arquivo."],
-          ["Vários de uma vez", "Até 10 arquivos; cada um vira um documento separado com a mesma categoria."],
+          ["Vários de uma vez", "Até 30 arquivos; cada um vira um documento separado, com a própria categoria e colaborador."],
           ["PDF com script", "PDFs com conteúdo ativo (JavaScript, anexos embutidos) são recusados. Gere o PDF de novo ou imprima como PDF."],
           ["Competência obrigatória", "Jornada e ponto, holerites e obrigações trabalhistas."],
           ["Vencimento obrigatório", "Exames ocupacionais (ASO)."],
+          ["Leitura automática", "Cada leitura fica registrada na auditoria (sem o conteúdo do documento). Se estiver indisponível, preencha manualmente."],
         ]} />
         <T>Substituir por uma nova versão</T>
         <Passos itens={[
