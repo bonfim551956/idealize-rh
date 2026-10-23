@@ -103,7 +103,7 @@ const SECOES: Secao[] = [
         ]} />
         <T>Entrar no dia a dia</T>
         <Passos itens={[
-          <>Acesse <B>idealize-rh.vercel.app</B>, informe e-mail e senha e clique em <Menu>Entrar</Menu>.</>,
+          <>Acesse <B>rh.oticasidealize.online</B>, informe e-mail e senha e clique em <Menu>Entrar</Menu>.</>,
           <>Se tiver verificação em duas etapas, digite o código de 6 dígitos do app autenticador.</>,
         ]} />
         <T>Verificação em duas etapas (app autenticador)</T>

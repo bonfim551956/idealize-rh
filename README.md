@@ -100,7 +100,7 @@ O jeito mais simples (igual ao PDV):
 3. Em *Environment Variables* adicione:
    - `VITE_SUPABASE_URL` = `https://ifqaukdkurkirmahpuky.supabase.co`
    - `VITE_SUPABASE_PUBLISHABLE_KEY` = `sb_publishable_K0XKMUMbZoWD1nP54G8tpA_b3fm5ZUr` (chave pública, feita para o navegador)
-4. Deploy. Anote o endereço (ex.: `https://idealize-rh.vercel.app`).
+4. Deploy. Anote o endereço (produção: `https://rh.oticasidealize.online`; reserva: `https://idealize-rh.vercel.app`).
 
 Alternativa sem GitHub: na pasta `web/`, rode `npx vercel --prod` e siga as perguntas.
 
