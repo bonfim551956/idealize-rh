@@ -1,6 +1,7 @@
 begin;
 insert into auth.users (email) values ('dir@sup.local'), ('sup@sup.local');
 select privado.bootstrap_diretoria('dir@sup.local');
+update public.usuarios set mfa_obrigatorio = true;
 select (select id from public.usuarios where email='dir@sup.local') as dir, (select id from public.usuarios where email='sup@sup.local') as sup \gset
 set role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub',:'dir','aal','aal2')::text, true);

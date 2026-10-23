@@ -55,6 +55,8 @@ select teste.ok((select count(*) from public.usuarios where email like '%@teste.
   'trigger do Auth cria public.usuarios para cada usuário novo');
 
 select privado.bootstrap_diretoria('diretor@teste.local');
+-- esta suíte testa o modo com MFA obrigatório
+update public.usuarios set mfa_obrigatorio = true;
 select teste.nega($$select privado.bootstrap_diretoria('dp@teste.local')$$, 'bootstrap só funciona uma vez');
 
 insert into teste.ctx values

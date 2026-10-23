@@ -136,7 +136,7 @@ function EditarLoja({ loja, fechar }: { loja: Partial<Loja>; fechar: () => void 
 /* =====================================================================
    Usuários e acessos
    ===================================================================== */
-type Usuario = { id: string; nome: string; email: string; ativo: boolean; criado_em: string };
+type Usuario = { id: string; nome: string; email: string; ativo: boolean; criado_em: string; mfa_obrigatorio?: boolean };
 type Atribuicao = { id: string; usuario_id: string; perfil_id: string; loja_id: string | null; concedido_em: string; valido_ate: string | null };
 type Perfil = { id: string; codigo: string; nome: string; descricao: string | null };
 
@@ -151,7 +151,7 @@ export function Acessos() {
     queryKey: ["acessos"],
     queryFn: async () => {
       const [u, a, p] = await Promise.all([
-        supabase.from("usuarios").select("id,nome,email,ativo,criado_em").order("nome"),
+        supabase.from("usuarios").select("id,nome,email,ativo,criado_em,mfa_obrigatorio").order("nome"),
         supabase.from("usuario_atribuicoes").select("id,usuario_id,perfil_id,loja_id,concedido_em,valido_ate").eq("ativo", true),
         supabase.from("perfis").select("id,codigo,nome,descricao").order("nome"),
       ]);
@@ -173,7 +173,8 @@ export function Acessos() {
               const proprio = u.id === sessao?.user.id;
               return (
                 <tr key={u.id} className="align-top hover:bg-fundo">
-                  <td className="px-4 py-3"><p className="font-medium">{u.nome}{proprio && <span className="text-texto-suave"> (você)</span>}</p><p className="text-xs text-texto-suave">{u.email}</p></td>
+                  <td className="px-4 py-3"><p className="font-medium">{u.nome}{proprio && <span className="text-texto-suave"> (você)</span>}</p><p className="text-xs text-texto-suave">{u.email}</p>
+                    <MfaUsuario u={u} proprio={proprio} /></td>
                   <td className="px-4 py-3">
                     {minhas.length === 0 ? <Selo tom="alerta">Sem acesso</Selo> : (
                       <ul className="flex flex-wrap gap-2">
@@ -377,7 +378,7 @@ export function Auditoria() {
    Minha conta
    ===================================================================== */
 export function Conta() {
-  const { sessao, nome, temFatorMfa, permissoes, recarregar } = useAuth();
+  const { sessao, nome, temFatorMfa, mfaObrigatorio, permissoes, recarregar } = useAuth();
   const avisar = useAvisos();
   const [senha, setSenha] = useState({ nova: "", confirma: "" });
   const [salvando, setSalvando] = useState(false);
@@ -405,16 +406,16 @@ export function Conta() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Cartao titulo="Verificação em duas etapas">
           <div className="flex items-start gap-3">
-            {temFatorMfa ? <ShieldCheck className="size-6 text-sucesso" aria-hidden /> : <ShieldOff className="size-6 text-alerta" aria-hidden />}
+            {mfaObrigatorio ? <ShieldCheck className="size-6 text-sucesso" aria-hidden /> : <ShieldOff className="size-6 text-texto-suave" aria-hidden />}
             <div className="text-sm">
-              <p className="font-medium">{temFatorMfa ? "Ativada" : "Não ativada"}</p>
-              <p className="text-texto-suave">{temFatorMfa
-                ? "Seu login exige o código do app autenticador."
-                : "Perfis que acessam dados sensíveis são obrigados a ativar. Para os demais é opcional, mas recomendado."}</p>
+              <p className="font-medium">{mfaObrigatorio ? (temFatorMfa ? "Ativada" : "Exigida — ainda não ativada") : "Não exigida para a sua conta"}</p>
+              <p className="text-texto-suave">{mfaObrigatorio
+                ? "Seu login pede o código do app autenticador."
+                : "Você entra só com e-mail e senha. Quem administra os acessos pode passar a exigir o autenticador."}</p>
             </div>
           </div>
-          {bloqueadas > 0 && <Aviso tom="alerta">{bloqueadas} permissão(ões) do seu perfil só liberam com a verificação em duas etapas.</Aviso>}
-          {!temFatorMfa && <AtivarMfa aoConcluir={recarregar} />}
+          {mfaObrigatorio && bloqueadas > 0 && <Aviso tom="alerta">{bloqueadas} permissão(ões) do seu perfil só liberam com a verificação em duas etapas.</Aviso>}
+          {mfaObrigatorio && !temFatorMfa && <AtivarMfa aoConcluir={recarregar} />}
         </Cartao>
         <Cartao titulo="Trocar senha">
           <form onSubmit={trocarSenha} className="flex flex-col gap-4">
@@ -465,5 +466,24 @@ function AtivarMfa({ aoConcluir }: { aoConcluir: () => Promise<void> }) {
       <Campo rotulo="Código do app" inputMode="numeric" maxLength={6} value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ""))} className="w-full" />
       <Botao type="submit" className="w-full" carregando={carregando} disabled={codigo.length !== 6}>Confirmar</Botao>
     </form>
+  );
+}
+
+/* Verificação em duas etapas exigida por usuário */
+function MfaUsuario({ u, proprio }: { u: Usuario; proprio: boolean }) {
+  const qc = useQueryClient();
+  const avisar = useAvisos();
+  const m = useMutation({
+    mutationFn: async (v: boolean) => { const { error } = await supabase.rpc("definir_mfa_obrigatorio", { p_usuario: u.id, p_obrigatorio: v }); if (error) throw error; return v; },
+    onSuccess: (v) => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", v ? `Verificação em duas etapas exigida para ${u.nome}.` : `${u.nome} entra só com senha.`); },
+    onError: (e) => avisar("erro", mensagemErro(e)),
+  });
+  if (proprio) return <p className="mt-1 text-xs text-texto-suave">{u.mfa_obrigatorio ? "Verificação em duas etapas: exigida" : "Entra só com senha"}</p>;
+  return (
+    <label className="mt-1 inline-flex cursor-pointer items-center gap-2 text-xs text-texto-suave">
+      <input type="checkbox" className="size-4 accent-primaria" checked={!!u.mfa_obrigatorio} disabled={m.isPending}
+        onChange={(e) => m.mutate(e.target.checked)} />
+      Exigir verificação em duas etapas
+    </label>
   );
 }

@@ -99,7 +99,7 @@ const SECOES: Secao[] = [
         <Passos itens={[
           <>Você recebe um e-mail de convite do sistema. Clique no link — ele vale por tempo limitado.</>,
           <>Crie sua senha: <B>mínimo de 10 caracteres, com letras e números</B>. Não reutilize senhas de outros sites.</>,
-          <>Se o seu perfil acessa dados sensíveis, o sistema pede para ativar a <B>verificação em duas etapas</B> (próximo tópico).</>,
+          <>Se a sua conta exigir a <B>verificação em duas etapas</B>, o sistema pede para ativá-la (próximo tópico).</>,
         ]} />
         <T>Entrar no dia a dia</T>
         <Passos itens={[
@@ -107,7 +107,7 @@ const SECOES: Secao[] = [
           <>Se tiver verificação em duas etapas, digite o código de 6 dígitos do app autenticador.</>,
         ]} />
         <T>Verificação em duas etapas (app autenticador)</T>
-        <P>É obrigatória para quem vê salários, dados pessoais completos, documentos de saúde, financeiros ou disciplinares, e para quem gerencia acessos. Sem ela, essas partes do sistema ficam bloqueadas.</P>
+        <P>Ela é exigida por conta: quem administra os acessos define, em <Menu>Usuários e acessos</Menu>, quem precisa do autenticador. Quando a sua conta exige, as partes sensíveis (salários, dados pessoais completos, documentos de saúde, financeiros ou disciplinares, gestão de acessos) só liberam depois do código.</P>
         <Passos itens={[
           <>Instale no celular o <B>Google Authenticator</B> ou o <B>Microsoft Authenticator</B> (gratuitos).</>,
           <>No app, toque em <Menu>+</Menu> e escolha <Menu>Ler código QR</Menu>. Aponte para o QR code que aparece na tela do sistema.</>,

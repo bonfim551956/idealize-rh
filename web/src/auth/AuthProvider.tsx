@@ -12,6 +12,8 @@ type Ctx = {
   permissoes: Permissao[];
   mfa: EstadoMfa;
   temFatorMfa: boolean;
+  /** a conta exige verificação em duas etapas */
+  mfaObrigatorio: boolean;
   /** Tem a permissão (em alguma loja, ou na loja informada). Só para a interface — o servidor valida de novo. */
   pode: (perm: string, loja?: string | null) => boolean;
   /** null = todas as lojas; array = só estas lojas */
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissoes, setPermissoes] = useState<Permissao[]>([]);
   const [mfa, setMfa] = useState<EstadoMfa>("ok");
   const [temFatorMfa, setTemFatorMfa] = useState(false);
+  const [mfaObrigatorio, setMfaObrigatorio] = useState(false);
   const [nome, setNome] = useState("");
 
   const carregarContexto = useCallback(async (s: Session | null) => {
@@ -40,16 +43,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.rpc("minhas_permissoes"),
       supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
       supabase.auth.mfa.listFactors(),
-      supabase.from("usuarios").select("nome").eq("id", s.user.id).maybeSingle(),
+      supabase.from("usuarios").select("nome,mfa_obrigatorio").eq("id", s.user.id).maybeSingle(),
     ]);
     const lista = (perms.data ?? []) as Permissao[];
     setPermissoes(lista);
     setNome(perfil.data?.nome ?? s.user.email ?? "");
     const verificados = (fatores.data?.totp ?? []).filter((f) => f.status === "verified");
     setTemFatorMfa(verificados.length > 0);
-    const privilegiado = lista.some((p) => p.exige_mfa);
-    if (aal.data?.currentLevel === "aal1" && aal.data?.nextLevel === "aal2") setMfa("verificar");
-    else if (privilegiado && verificados.length === 0) setMfa("cadastrar");
+    // MFA é exigido por usuário (usuarios.mfa_obrigatorio); sem a exigência, entra só com senha
+    const obrigatorio = perfil.data?.mfa_obrigatorio ?? true;
+    setMfaObrigatorio(obrigatorio);
+    if (!obrigatorio) setMfa("ok");
+    else if (aal.data?.currentLevel === "aal1" && aal.data?.nextLevel === "aal2") setMfa("verificar");
+    else if (verificados.length === 0) setMfa("cadastrar");
     else setMfa("ok");
   }, []);
 
@@ -90,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [sessao]);
 
   const valor = useMemo<Ctx>(() => ({
-    carregando, sessao, nome, permissoes, mfa, temFatorMfa,
+    carregando, sessao, nome, permissoes, mfa, temFatorMfa, mfaObrigatorio,
     pode: (perm, loja) =>
       permissoes.some((p) => p.permissao === perm && p.liberada_na_sessao &&
         (loja === undefined || p.loja_id === null || p.loja_id === loja)),
@@ -101,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     recarregar: () => carregarContexto(sessao),
     sair: async () => { await supabase.auth.signOut(); },
-  }), [carregando, sessao, nome, permissoes, mfa, temFatorMfa, carregarContexto]);
+  }), [carregando, sessao, nome, permissoes, mfa, temFatorMfa, mfaObrigatorio, carregarContexto]);
 
   return <AuthCtx.Provider value={valor}>{children}</AuthCtx.Provider>;
 }
