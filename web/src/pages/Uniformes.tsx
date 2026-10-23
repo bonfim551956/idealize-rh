@@ -74,11 +74,11 @@ type Acao =
   | null;
 
 export function Uniformes() {
-  const { pode, lojasCom } = useAuth();
+  const { pode } = useAuth();
   const estoque = useEstoque();
   const [acao, setAcao] = useState<Acao>(null);
-  const entrega = pode("uniforme.movimentar");                                          // entrega/devolução (em alguma loja)
-  const movimenta = entrega && lojasCom("uniforme.movimentar") === null;                // estoque central: todas as lojas
+  const entrega = pode("uniforme.movimentar");   // entrega/devolução aos colaboradores
+  const movimenta = pode("uniforme.estoque");    // estoque central: entrada, baixa, inventário, estorno
   const gere = pode("uniforme.gerir");
 
   const itens = useMemo(() => ordenar(estoque.data ?? []), [estoque.data]);
@@ -512,12 +512,12 @@ function EstornoModal({ mov, fechar }: { mov: Movimento; fechar: () => void }) {
 
 /* ---------------- Aba na ficha do colaborador ---------------- */
 export function UniformesColaborador({ c }: { c: ColaboradorLinha }) {
-  const { pode, lojasCom } = useAuth();
+  const { pode } = useAuth();
   const posse = usePosse(c.id);
   const estoque = useEstoque();
   const [acao, setAcao] = useState<Acao>(null);
   const entrega = pode("uniforme.movimentar", c.loja_atual_id);
-  const movimenta = entrega && lojasCom("uniforme.movimentar") === null;
+  const movimenta = pode("uniforme.estoque");
   const encerrado = c.status === "desligado" || c.status === "arquivado";
   const total = (posse.data ?? []).reduce((s, p) => s + p.quantidade, 0);
   return (

@@ -540,7 +540,7 @@ const SECOES: Secao[] = [
             ["Lancei errado", <>Em <Menu>Movimentações</Menu>, ícone de <B>seta circular</B> (estorno). O lançamento não é apagado: fica o original e o estorno</>],
           ]} />
           <Dica>Troca de tamanho = <B>Devolução</B> do tamanho antigo + <B>Entrega</B> do novo.</Dica>
-          {!c.todasLojas("uniforme.movimentar") && <Atencao>Seu acesso permite entregar e receber uniformes dos colaboradores das suas lojas. Entrada de estoque, baixa, inventário e estorno ficam com o RH/DP.</Atencao>}
+          {!c.pode("uniforme.estoque") && <Atencao>Seu acesso permite entregar e receber uniformes dos colaboradores. Entrada de estoque, baixa, inventário e estorno ficam com o RH/DP.</Atencao>}
           <Atencao>O sistema não deixa entregar mais do que há em estoque nem registrar devolução de peças que o colaborador não tem.</Atencao>
         </>}
         {c.pode("uniforme.gerir") && <>
@@ -603,7 +603,7 @@ const SECOES: Secao[] = [
           [<B>Proprietário / Diretoria</B>, "Sócios", "Tudo", "—"],
           [<B>RH central</B>, "Responsável geral de RH com poder de diretoria", "Tudo, inclusive conceder acessos e ver auditoria", "—"],
           [<B>Departamento Pessoal</B>, "Quem cuida do dia a dia de pessoas", "Cadastros, dados pessoais, salários, situações, transferências, promoções, desligamentos, documentos (inclusive saúde e financeiros), conferência", "Dar acessos, ver auditoria, cadastrar lojas/cargos, documentos jurídicos, enviar advertências"],
-          [<B>Supervisor</B>, "Supervisor de uma ou mais lojas (conceda uma vez por loja)", "Ver a equipe das suas lojas, salários (só leitura), documentos gerais, painel, entregar e receber uniformes", "CPF completo, alterar salário, saúde, cadastros e ações; entrada/baixa de estoque de uniformes"],
+          [<B>Supervisor</B>, "Supervisor (normalmente todas as lojas)", "Ver a equipe das lojas, salários (só leitura), documentos gerais, painel, entregar e receber uniformes", "CPF completo, alterar salário, saúde, cadastros e ações; entrada/baixa de estoque de uniformes"],
           [<B>Gerente de loja</B>, "Gerente (sempre com 1 loja)", "Ver a equipe da própria loja, documentos gerais (treinamentos, ponto), painel", "CPF completo, salários, saúde, cadastros e ações"],
           [<B>Contabilidade (externa)</B>, "Escritório contábil", "Dados pessoais, salários, documentos pessoais, contratuais e financeiros", "Saúde, disciplinar, cadastros e ações"],
           [<B>Jurídico</B>, "Advogado, por caso", "Leitura ampla, inclusive documentos jurídicos", "Qualquer alteração"],
