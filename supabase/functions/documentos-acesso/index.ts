@@ -1,7 +1,7 @@
 // POST { documento_id, versao?, acao: "visualizar" | "download" }
 // Autoriza pelo banco (JWT do usuário, acesso fica registrado) e devolve
 // uma URL assinada válida por 60 segundos. Nunca existe link permanente.
-import { clienteServico, clienteUsuario, cors, resposta } from "../_shared/comum.ts";
+import { clienteServico, clienteUsuario, cors, nomeComExtensao, resposta } from "../_shared/comum.ts";
 
 const VALIDADE_SEGUNDOS = 60;
 
@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
   if (!arq) return resposta(req, 403, { erro: "Acesso negado a este documento" });
 
   const { data: assinada, error: urlErro } = await clienteServico().storage.from("documentos")
-    .createSignedUrl(arq.storage_path, VALIDADE_SEGUNDOS, acao === "download" ? { download: arq.nome_arquivo } : undefined);
+    .createSignedUrl(arq.storage_path, VALIDADE_SEGUNDOS, acao === "download" ? { download: nomeComExtensao(arq.nome_arquivo ?? "", arq.mime_type) } : undefined);
   if (urlErro || !assinada) return resposta(req, 502, { erro: "Não foi possível gerar o link" });
 
   return resposta(req, 200, { url: assinada.signedUrl, expira_em_segundos: VALIDADE_SEGUNDOS, tipo: arq.mime_type });

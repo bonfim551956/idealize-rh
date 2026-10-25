@@ -66,3 +66,18 @@ export async function sha256(b: Uint8Array): Promise<string> {
 export function nomeSeguro(nome: string): string {
   return nome.normalize("NFKC").replace(/[\\/\u0000-\u001f]/g, "_").slice(0, 200) || "arquivo";
 }
+
+const EXTENSAO_DO_TIPO: Record<string, string> = {
+  "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
+};
+
+/** Nome de arquivo com a extensão do tipo REAL (detectado pelo conteúdo), nunca a do cliente.
+ *  Remove caracteres invisíveis/de direção (ex.: U+202E), aspas e ponto e vírgula. */
+export function nomeComExtensao(nome: string, tipo: string): string {
+  const base = nomeSeguro(nome)
+    .replace(/[\p{Cf}\p{Cc}"';<>|*?:]/gu, "_")
+    .replace(/\.[^.]*$/, "")
+    .replace(/^[.\s]+|[.\s]+$/g, "")
+    .slice(0, 190) || "arquivo";
+  return `${base}.${EXTENSAO_DO_TIPO[tipo] ?? "bin"}`;
+}

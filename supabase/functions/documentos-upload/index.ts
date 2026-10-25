@@ -7,7 +7,7 @@
 // Fluxo: valida arquivo → documento_preparar_upload (JWT do usuário, checa permissão)
 //        → grava no bucket privado (chave de serviço) → documento_confirmar_upload (JWT do usuário)
 import {
-  clienteServico, clienteUsuario, cors, detectarTipo, nomeSeguro, pdfSuspeito, resposta, sha256, TAMANHO_MAXIMO,
+  clienteServico, clienteUsuario, cors, detectarTipo, nomeComExtensao, pdfSuspeito, resposta, sha256, TAMANHO_MAXIMO,
 } from "../_shared/comum.ts";
 
 Deno.serve(async (req) => {
@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
   const documentoId = (form.get("documento_id") as string) || null;
   const motivo = (form.get("motivo") as string) || null;
   const hash = await sha256(bytes);
-  const nomeArquivo = nomeSeguro(arquivo.name);
+  // extensão sempre do tipo detectado pelo conteúdo (evita holerite.hta com cabeçalho de JPEG)
+  const nomeArquivo = nomeComExtensao(arquivo.name, tipo);
 
   // 1) Autoriza e reserva a versão (RLS + permissão por sigilo e loja)
   const { data: prep, error: prepErro } = await usuario.rpc("documento_preparar_upload", {

@@ -24,6 +24,20 @@ type Ctx = {
 
 const AuthCtx = createContext<Ctx | null>(null);
 const INATIVIDADE_MS = 30 * 60 * 1000; // encerra a sessão após 30 min sem uso
+const CHAVE_ATIVIDADE = "rh360.ultimaAtividade";
+function registrarAtividade(t: number) {
+  try { localStorage.setItem(CHAVE_ATIVIDADE, String(t)); } catch { /* armazenamento indisponível */ }
+}
+function limparAtividade() {
+  try { localStorage.removeItem(CHAVE_ATIVIDADE); } catch { /* armazenamento indisponível */ }
+}
+/** true quando a última atividade registrada passou do limite (sem registro = não encerra) */
+function inativoDemais(): boolean {
+  try {
+    const t = Number(localStorage.getItem(CHAVE_ATIVIDADE));
+    return Number.isFinite(t) && t > 0 && Date.now() - t > INATIVIDADE_MS;
+  } catch { return false; }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [carregando, setCarregando] = useState(true);
@@ -63,6 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let ativo = true;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!ativo) return;
+      // sessão guardada de uma aba fechada há mais de 30 min: encerra antes de abrir
+      if (data.session && inativoDemais()) {
+        await supabase.auth.signOut({ scope: "local" });
+        limparAtividade();
+        setSessao(null);
+        await carregarContexto(null);
+        setCarregando(false);
+        return;
+      }
       setSessao(data.session);
       await carregarContexto(data.session);
       setCarregando(false);
@@ -82,15 +105,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!sessao) return;
+    // a última atividade fica gravada (vale para todas as abas e sobrevive ao fechar o navegador)
+    let ultimaGravacao = 0;
     const reiniciar = () => {
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => { supabase.auth.signOut(); }, INATIVIDADE_MS);
+      const agora = Date.now();
+      if (agora - ultimaGravacao > 15_000) { ultimaGravacao = agora; registrarAtividade(agora); }
+    };
+    const verificar = () => {
+      if (inativoDemais()) { limparAtividade(); supabase.auth.signOut(); }
     };
     const eventos = ["mousedown", "keydown", "touchstart", "scroll"] as const;
     eventos.forEach((e) => window.addEventListener(e, reiniciar, { passive: true }));
-    reiniciar();
+    registrarAtividade(Date.now());
+    timer.current = window.setInterval(verificar, 30_000);
+    document.addEventListener("visibilitychange", verificar);
     return () => {
-      window.clearTimeout(timer.current);
+      window.clearInterval(timer.current);
+      document.removeEventListener("visibilitychange", verificar);
       eventos.forEach((e) => window.removeEventListener(e, reiniciar));
     };
   }, [sessao]);
@@ -106,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return ps.map((p) => p.loja_id!) ;
     },
     recarregar: () => carregarContexto(sessao),
-    sair: async () => { await supabase.auth.signOut(); },
+    sair: async () => { limparAtividade(); await supabase.auth.signOut(); },
   }), [carregando, sessao, nome, permissoes, mfa, temFatorMfa, mfaObrigatorio, carregarContexto]);
 
   return <AuthCtx.Provider value={valor}>{children}</AuthCtx.Provider>;

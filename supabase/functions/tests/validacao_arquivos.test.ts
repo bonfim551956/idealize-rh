@@ -1,4 +1,4 @@
-import { detectarTipo, pdfSuspeito, nomeSeguro } from "../_shared/comum.ts";
+import { detectarTipo, pdfSuspeito, nomeSeguro, nomeComExtensao } from "../_shared/comum.ts";
 const enc = (s: string) => new TextEncoder().encode(s);
 const casos: [string, Uint8Array, string | null][] = [
   ["pdf", enc("%PDF-1.7\n..."), "application/pdf"],
@@ -13,4 +13,12 @@ for (const [n, b, esp] of casos) { const r = detectarTipo(b); if (r !== esp) { f
 if (!pdfSuspeito(enc("%PDF-1.4 /OpenAction << /JS (app.alert(1)) >>"))) { falhas++; console.log("FALHOU pdf com JS"); } else console.log("ok - pdf com JavaScript recusado");
 if (pdfSuspeito(enc("%PDF-1.4 /Type /Page"))) { falhas++; console.log("FALHOU pdf normal"); } else console.log("ok - pdf normal aceito");
 if (nomeSeguro("../../etc/passwd") !== ".._.._etc_passwd") { falhas++; console.log("FALHOU nome", nomeSeguro("../../etc/passwd")); } else console.log("ok - nome de arquivo sanitizado");
+const ext: [string, string, string][] = [
+  ["holerite.hta", "image/jpeg", "holerite.jpg"],
+  ["Recibo\u202Egpj.hta", "image/png", "Recibo_gpj.png"],
+  ["contrato.PDF", "application/pdf", "contrato.pdf"],
+  ['a"b;c.html', "image/webp", "a_b_c.webp"],
+  [".hta", "application/pdf", "arquivo.pdf"],
+];
+for (const [n, t, esp] of ext) { const r = nomeComExtensao(n, t); if (r !== esp) { falhas++; console.log("FALHOU extensão", n, r); } else console.log("ok - extensão do tipo real:", r); }
 if (falhas) Deno.exit(1);
