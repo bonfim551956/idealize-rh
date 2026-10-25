@@ -36,6 +36,12 @@ begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', (select id from auth.users where email = p_email), 'role', 'authenticated', 'aal', p_aal)::text, true);
 end $$;
+
+-- simula a Edge Function gravando o arquivo no bucket (chave de serviço)
+create function teste.simular_arquivo(p_versao uuid) returns void language plpgsql security definer as $$
+begin
+  insert into storage.objects (bucket_id, name) select 'documentos', storage_path from public.documento_versoes where id = p_versao;
+end $$;
 grant execute on all functions in schema teste to authenticated, anon;
 
 -- ---------------------------------------------------------------------
@@ -179,6 +185,7 @@ do $$ declare r record; begin
     'aso.pdf', 'application/pdf', 1024, repeat('a', 64));
   perform set_config('teste.doc_saude', r.documento_id::text, false);
   perform set_config('teste.ver_saude', r.versao_id::text, false);
+  perform teste.simular_arquivo(r.versao_id);
   perform public.documento_confirmar_upload(r.versao_id);
 end $$;
 select teste.ok((select status::text from public.documentos where id = current_setting('teste.doc_saude')::uuid) = 'recebido',
@@ -203,6 +210,7 @@ do $$ declare r record; begin
   select * into r from public.documento_preparar_upload(null,
     jsonb_build_object('nome','Certificado treinamento','categoria_id',teste.id('cat_geral'),'colaborador_id',teste.id('col_a')),
     'cert.pdf', 'application/pdf', 2048, repeat('d', 64));
+  perform teste.simular_arquivo(r.versao_id);
   perform public.documento_confirmar_upload(r.versao_id);
   perform set_config('teste.doc_geral', r.documento_id::text, false);
 end $$;
