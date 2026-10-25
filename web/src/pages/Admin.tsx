@@ -425,7 +425,7 @@ export function Conta() {
           </form>
         </Cartao>
         <Cartao titulo="Sessões">
-          <p className="mb-4 text-sm text-texto-suave">A sessão termina sozinha após 30 minutos sem uso. Se perdeu um aparelho, encerre todas as sessões.</p>
+          <p className="mb-4 text-sm text-texto-suave">A sessão termina sozinha após 20 minutos sem uso. Se perdeu um aparelho, encerre todas as sessões.</p>
           <Botao variante="secundaria" onClick={sairDeTodos}>Sair de todos os dispositivos</Botao>
         </Cartao>
       </div>

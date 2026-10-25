@@ -671,7 +671,7 @@ const SECOES: Secao[] = [
           c.pode("colaborador.transferir") && ["A loja de destino não aparece na transferência.", "Só aparecem lojas do mesmo CNPJ e às quais você tem acesso. Entre empresas diferentes do grupo, fale com a diretoria."],
           c.enviaAlgumDoc && ["O envio do documento falhou.", "Confira formato (PDF, JPG, PNG, WEBP) e tamanho (até 20 MB). PDF recusado por conteúdo ativo: gere o PDF de novo (Imprimir → Salvar como PDF)."],
           c.leAlgumDoc && ["O link do documento não abre mais.", "Por segurança ele vale 60 segundos. Clique de novo no ícone para gerar outro."],
-          ["Fui desconectado sozinho.", "A sessão termina após 30 minutos sem uso. Entre novamente."],
+          ["Fui desconectado sozinho.", "A sessão termina após 20 minutos sem uso. Entre novamente."],
         ].filter(Boolean) as [string, string][]).map(([p, r]) => (
           <div key={p}>
             <p className="text-sm font-semibold">{p}</p>

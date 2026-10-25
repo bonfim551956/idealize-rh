@@ -117,7 +117,7 @@ Alternativa sem GitHub: na pasta `web/`, rode `npx vercel --prod` e siga as perg
 3. Entre no sistema: ele pede para ativar a verificação em duas etapas (app autenticador). A partir daí, convide os demais em *Usuários e acessos*.
 
 ### Interface — o que tem
-Login, recuperação e criação de senha, verificação em duas etapas obrigatória para perfis sensíveis, encerramento por inatividade (30 min),
+Login, recuperação e criação de senha, verificação em duas etapas obrigatória para perfis sensíveis, encerramento por inatividade (20 min),
 painel com indicadores reais, colaboradores (lista, filtros, cadastro), ficha (visão geral, dados pessoais revelados sob auditoria, movimentações,
 documentos, linha do tempo), ações (situação, transferência, promoção, salário, desligamento), documentos (envio múltiplo, conferência, versões,
 arquivamento, visualização por link de 60 s), lojas e cargos, usuários e acessos (convite, concessão por loja, revogação), auditoria e minha conta.

@@ -23,7 +23,7 @@ type Ctx = {
 };
 
 const AuthCtx = createContext<Ctx | null>(null);
-const INATIVIDADE_MS = 30 * 60 * 1000; // encerra a sessão após 30 min sem uso
+const INATIVIDADE_MS = 20 * 60 * 1000; // encerra a sessão após 20 min sem uso
 const CHAVE_ATIVIDADE = "rh360.ultimaAtividade";
 function registrarAtividade(t: number) {
   try { localStorage.setItem(CHAVE_ATIVIDADE, String(t)); } catch { /* armazenamento indisponível */ }
@@ -77,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let ativo = true;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!ativo) return;
-      // sessão guardada de uma aba fechada há mais de 30 min: encerra antes de abrir
+      // sessão guardada de uma aba fechada há mais de 20 min: encerra antes de abrir
       if (data.session && inativoDemais()) {
         await supabase.auth.signOut({ scope: "local" });
         limparAtividade();
