@@ -124,7 +124,7 @@ const SECOES: Secao[] = [
         <T>Sair e sessão</T>
         <Lista itens={[
           <>Para sair, use <Menu>Sair</Menu> no rodapé do menu (no celular, abra o menu ☰).</>,
-          <>A sessão termina sozinha após <B>30 minutos sem uso</B>. É só entrar de novo.</>,
+          <>A sessão termina sozinha após <B>20 minutos sem uso</B>. É só entrar de novo.</>,
           <>Em <Menu>Minha conta</Menu> você troca a senha, vê o status da verificação em duas etapas e pode <B>sair de todos os dispositivos</B> (use se esqueceu o sistema aberto em outro computador).</>,
         ]} />
       </>
