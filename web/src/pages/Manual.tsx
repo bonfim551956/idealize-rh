@@ -582,7 +582,7 @@ const SECOES: Secao[] = [
   },
   {
     id: "usuarios", titulo: "Usuários e acessos", icone: UserCog, grupo: "Administração",
-    palavras: "usuário convidar convite acesso perfil conceder revogar permissão loja escopo validade gerente contabilidade dp rh",
+    palavras: "usuário convidar convite reenviar pendente acesso perfil conceder revogar permissão loja escopo validade gerente contabilidade dp rh",
     mostrar: (c) => c.pode("acesso.gerir"),
     conteudo: () => (
       <>
@@ -590,6 +590,7 @@ const SECOES: Secao[] = [
         <Passos itens={[
           <>Em <Menu>Usuários e acessos</Menu>, clique em <Menu>Convidar usuário</Menu>.</>,
           <>Informe nome e e-mail. A pessoa recebe o convite, cria a senha e entra <B>sem acesso nenhum</B> até você conceder um perfil.</>,
+          <>O link do convite vale <B>24 horas</B>. Enquanto a pessoa não ativar a conta, aparece <B>Convite pendente</B> na linha dela: clique em <Menu>Reenviar convite</Menu> para mandar um novo e-mail (peça para olhar também o spam).</>,
         ]} />
         <T>Conceder um perfil</T>
         <Passos itens={[

@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MailPlus, Pencil, Plus, ShieldCheck, ShieldOff, UserCog, X } from "lucide-react";
+import { MailPlus, Pencil, Plus, Send, ShieldCheck, ShieldOff, UserCog, X } from "lucide-react";
 import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useEmpresas, useLojas, type Loja } from "../lib/dados";
 import { dataHora, so_digitos } from "../lib/formato";
@@ -158,6 +158,15 @@ export function Acessos() {
       return { usuarios: falhar(u) as Usuario[], atrib: falhar(a) as Atribuicao[], perfis: falhar(p) as Perfil[] };
     },
   });
+  // convites ainda não ativados (só quem gerencia acessos recebe a lista)
+  const pendentes = useQuery({
+    queryKey: ["acessos", "convites-pendentes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("usuarios_convites_pendentes");
+      if (error) return new Map<string, string>();
+      return new Map((data as { usuario_id: string; convidado_em: string }[]).map((c) => [c.usuario_id, c.convidado_em]));
+    },
+  });
 
   const nomeLoja = (id: string | null) => id ? lojas.data?.find((l) => l.id === id)?.nome ?? "Loja" : "Todas as lojas";
 
@@ -174,7 +183,8 @@ export function Acessos() {
               return (
                 <tr key={u.id} className="align-top hover:bg-fundo">
                   <td className="px-4 py-3"><p className="font-medium">{u.nome}{proprio && <span className="text-texto-suave"> (você)</span>}</p><p className="text-xs text-texto-suave">{u.email}</p>
-                    <MfaUsuario u={u} proprio={proprio} /></td>
+                    <MfaUsuario u={u} proprio={proprio} />
+                    {pendentes.data?.has(u.id) && <ConvitePendente u={u} desde={pendentes.data.get(u.id)!} />}</td>
                   <td className="px-4 py-3">
                     {minhas.length === 0 ? <Selo tom="alerta">Sem acesso</Selo> : (
                       <ul className="flex flex-wrap gap-2">
@@ -201,6 +211,24 @@ export function Acessos() {
       {concedendo && q.data && <Conceder usuario={concedendo} perfis={q.data.perfis} fechar={() => setConcedendo(null)} />}
       {revogando && <Revogar {...revogando} fechar={() => setRevogando(null)} />}
     </>
+  );
+}
+
+function ConvitePendente({ u, desde }: { u: Usuario; desde: string }) {
+  const qc = useQueryClient();
+  const avisar = useAvisos();
+  const m = useMutation({
+    mutationFn: () => chamarFuncao("usuarios-convidar", JSON.stringify({ reenviar: true, usuario_id: u.id })),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", `Convite reenviado para ${u.email}.`); },
+    onError: (e) => avisar("erro", mensagemErro(e)),
+  });
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <Selo tom="alerta">Convite pendente · enviado em {dataHora(desde)}</Selo>
+      <Botao tamanho="sm" variante="secundaria" icone={<Send className="size-4" />} carregando={m.isPending} onClick={() => m.mutate()}>
+        Reenviar convite
+      </Botao>
+    </div>
   );
 }
 
