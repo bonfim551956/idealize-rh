@@ -10,14 +10,24 @@ select (select id from public.usuarios where email='dir@p97.local') as dir,
 set role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub',:'dir','aal','aal2')::text, true);
 select public.conceder_acesso(:'ger','gerente_loja',:'cam');
--- experiência: admitida há 40 dias (1º período termina em 4 dias)
+-- experiência: sem cargo = 15 + 15; admitida há 10 dias (1º período termina em 4 dias)
 select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Ana Experiencia','cpf','52998224725','loja_id',:'sor','matricula','901',
-  'tipo','clt_experiencia','status_inicial','ativo','data_admissao',(current_date - 40)::text,
+  'tipo','clt_experiencia','status_inicial','ativo','data_admissao',(current_date - 10)::text,
   'data_nascimento',(current_date + 5 - interval '30 years')::date::text)) as ana \gset
 -- férias: admitido há 2 anos e 11 meses; 1º período gozado (30 dias), 2º período só 10 dias
 select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Bruno Ferias','cpf','11144477735','loja_id',:'sor','matricula','902',
   'tipo','clt_prazo_indeterminado','status_inicial','ativo','data_admissao',(current_date - interval '35 months')::date::text,
   'data_nascimento','1990-01-01')) as bruno \gset
+-- consultor: 15 + 30; admitido há 40 dias (prorrogação termina em 4 dias)
+reset role;
+insert into public.cargos (nome) values ('Consultor comercial teste') returning id as cons \gset
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub',:'dir','aal','aal2')::text, true);
+select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Diego Consultor','cpf','16899535009','loja_id',:'sor','matricula','904',
+  'tipo','clt_experiencia','status_inicial','ativo','data_admissao',(current_date - 40)::text,'cargo_id',:'cons'));
+-- experiência vencida (sem cargo, admitido há 50 dias e ainda marcado como experiência)
+select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Eva Vencida','cpf','74682489070','loja_id',:'sor','matricula','905',
+  'tipo','clt_experiencia','status_inicial','ativo','data_admissao',(current_date - 50)::text));
 -- loja que o gerente de Campinas não vê nem é o caso; colaborador de Campinas com aniversário amanhã
 select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Carla Campinas','cpf','39053344705','loja_id',:'cam','matricula','903',
   'tipo','clt_prazo_indeterminado','status_inicial','ativo','data_admissao','2026-01-05',
@@ -39,8 +49,13 @@ select set_config('request.jwt.claims', json_build_object('sub',:'dir','aal','aa
 select public.painel_avisos() as av \gset
 select set_config('teste.av', :'av', false);
 do $$ declare av jsonb := current_setting('teste.av')::jsonb; f jsonb; begin
-  if jsonb_array_length(av->'experiencia') <> 1 or (av->'experiencia'->0->>'fase') <> 'primeiro' or (av->'experiencia'->0->>'dias')::int <> 4 then
-    raise exception 'FALHOU experiência: %', av->'experiencia'; end if;
+  if jsonb_array_length(av->'experiencia') <> 3 then raise exception 'FALHOU experiência: %', av->'experiencia'; end if;
+  if not exists (select 1 from jsonb_array_elements(av->'experiencia') e where e->>'nome' = 'EVA VENCIDA' and e->>'fase' = 'vencido' and (e->>'dias')::int = -21) then
+    raise exception 'FALHOU experiência vencida: %', av->'experiencia'; end if;
+  if not exists (select 1 from jsonb_array_elements(av->'experiencia') e where e->>'nome' = 'ANA EXPERIENCIA' and e->>'fase' = 'primeiro' and (e->>'dias')::int = 4 and e->>'regra' = '15 + 15') then
+    raise exception 'FALHOU experiência 15+15: %', av->'experiencia'; end if;
+  if not exists (select 1 from jsonb_array_elements(av->'experiencia') e where e->>'nome' = 'DIEGO CONSULTOR' and e->>'fase' = 'prorrogacao' and (e->>'dias')::int = 4 and e->>'regra' = '15 + 30') then
+    raise exception 'FALHOU experiência de consultor 15+30: %', av->'experiencia'; end if;
   if jsonb_array_length(av->'ferias') <> 1 then raise exception 'FALHOU férias: %', av->'ferias'; end if;
   f := av->'ferias'->0;
   if (f->>'dias_gozados')::int <> 10 or (f->>'saldo')::int <> 20 then raise exception 'FALHOU saldo de férias: %', f; end if;

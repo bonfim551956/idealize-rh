@@ -64,11 +64,12 @@ export function Lojas() {
                 <button onClick={() => alternarCargo.mutate(c)} title={c.ativo ? "Clique para desativar" : "Clique para reativar"}
                   className={c.ativo ? "rounded-full border border-borda bg-superficie px-3 py-1 text-sm hover:border-perigo" : "rounded-full border border-borda bg-fundo px-3 py-1 text-sm text-texto-suave line-through hover:border-primaria"}>
                   {c.nome}
+                  {c.experiencia_dias_1 != null && <span className="ml-1 text-xs text-texto-suave">· exp. {c.experiencia_dias_1}+{c.experiencia_dias_2}</span>}
                 </button>
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-texto-suave">Cargos não são apagados: desativar remove da lista de escolha, mas preserva o histórico.</p>
+          <p className="mt-3 text-xs text-texto-suave">Cargos não são apagados: desativar remove da lista de escolha, mas preserva o histórico. “exp.” é o período de experiência do cargo (dias + prorrogação).</p>
         </Cartao>
       </div>
       {editando && <EditarLoja loja={editando} fechar={() => setEditando(null)} />}

@@ -6,7 +6,7 @@ export type Loja = {
   cep: string | null; telefone: string | null; ativa: boolean; dados_confirmados: boolean; observacao: string | null;
   empresa_id: string; empresas?: { razao_social: string; cnpj: string } | null;
 };
-export type Cargo = { id: string; nome: string; ativo: boolean };
+export type Cargo = { id: string; nome: string; ativo: boolean; experiencia_dias_1?: number; experiencia_dias_2?: number };
 export type Categoria = { id: string; codigo: string; nome: string; nivel_sigilo: string; exige_vencimento: boolean; exige_competencia: boolean; ativa: boolean };
 
 export type ColaboradorLinha = {
@@ -40,7 +40,7 @@ export function useLojas() {
 export function useCargos() {
   return useQuery({
     queryKey: ["cargos"],
-    queryFn: async () => falhar(await supabase.from("cargos").select("id,nome,ativo").order("nome")) as Cargo[],
+    queryFn: async () => falhar(await supabase.from("cargos").select("id,nome,ativo,experiencia_dias_1,experiencia_dias_2").order("nome")) as Cargo[],
   });
 }
 

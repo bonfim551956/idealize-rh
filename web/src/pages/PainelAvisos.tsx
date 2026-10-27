@@ -8,7 +8,7 @@ import { Cartao, Carregando, EstadoErro, Selo } from "../ui/componentes";
 
 type Experiencia = {
   colaborador_id: string; nome: string; loja: string; admissao: string;
-  fim_primeiro: string; fim_prorrogacao: string; fase: "primeiro" | "prorrogacao"; termina_em: string; dias: number;
+  fim_primeiro: string; fim_prorrogacao: string; regra: string; fase: "primeiro" | "prorrogacao" | "vencido"; termina_em: string; dias: number;
 };
 type Ferias = {
   colaborador_id: string; nome: string; loja: string; aquisitivo_inicio: string; aquisitivo_fim: string;
@@ -67,15 +67,17 @@ export function PainelAvisos({ loja }: { loja: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <Lista titulo="Período de experiência" icone={CalendarClock} itens={a.experiencia}
-        vazio="Nenhum contrato de experiência terminando nos próximos 15 dias."
-        rodape="Considera 45 + 45 dias. Decida antes do fim: prorrogar, efetivar ou encerrar."
+        vazio="Nenhum contrato de experiência terminando nos próximos 7 dias."
+        rodape="Regra do cargo: 15 + 15 dias (consultores: 15 + 30). Decida antes do fim: prorrogar, efetivar ou encerrar. “Encerrada” = o prazo passou e o cadastro ainda está como experiência."
         render={(e) => (
           <div className="flex items-start justify-between gap-3">
             <Nome id={e.colaborador_id} nome={e.nome} loja={e.loja} />
             <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-              {prazo(e.dias)}
+              {e.fase === "vencido" ? <Selo tom="perigo">Atualizar contrato</Selo> : prazo(e.dias)}
               <span className="text-xs text-texto-suave">
-                {e.fase === "primeiro" ? "1º período" : "Prorrogação"} termina {data(e.termina_em)}
+                {e.fase === "primeiro" ? `1º período (${e.regra}) termina ${data(e.termina_em)}`
+                  : e.fase === "prorrogacao" ? `Prorrogação (${e.regra}) termina ${data(e.termina_em)}`
+                  : `Experiência (${e.regra}) encerrada em ${data(e.termina_em)}`}
               </span>
             </div>
           </div>
