@@ -306,7 +306,7 @@ const SECOES: Secao[] = [
           ["Em desligamento", "Ativo (cancela o desligamento) · Desligado (só concluindo o processo)"],
           ["Desligado", "Arquivado"],
         ]} />
-        <Atencao>Em afastamentos e licenças, <B>não escreva diagnóstico nem CID</B> no motivo (use, por exemplo, “Afastamento por atestado médico”). O atestado vai como documento na categoria <B>Afastamentos e licenças</B>, que é protegida.</Atencao>
+        <Atencao>Em afastamentos e licenças, <B>não escreva diagnóstico nem CID</B> no motivo (use, por exemplo, “Afastamento por atestado médico”). O atestado vai como documento na categoria <B>Atestados médicos</B>, que é protegida (só DP, RH e diretoria).</Atencao>
         <Dica>Desistiu de um desligamento? Use <Menu>Mudar situação</Menu> → <B>Ativo</B> e explique no motivo. O processo fica registrado como cancelado.</Dica>
       </>
     ),
