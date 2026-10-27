@@ -127,8 +127,9 @@ Hoje é ${hoje}.`;
         max_tokens: 1024,
         system: sistema,
         tools: [ferramenta],
-        tool_choice: { type: "tool", name: "registrar_classificacao" },
-        messages: [{ role: "user", content: [bloco, { type: "text", text: "Classifique o documento anexado." }] }],
+        // o modelo atual não aceita ferramenta forçada; o prompt exige a chamada e o servidor revalida tudo
+        tool_choice: { type: "auto" },
+        messages: [{ role: "user", content: [bloco, { type: "text", text: "Classifique o documento anexado chamando a ferramenta registrar_classificacao. Não responda em texto." }] }],
       }),
       signal: AbortSignal.timeout(90_000),
     });
@@ -145,7 +146,10 @@ Hoje é ${hoje}.`;
   }
   const json = await respIA.json();
   const uso = json?.content?.find((c: { type: string }) => c.type === "tool_use")?.input as Record<string, unknown> | undefined;
-  if (!uso) return resposta(req, 502, { erro: "A leitura automática não retornou uma classificação." });
+  if (!uso) {
+    console.error("ia_sem_ferramenta", json?.stop_reason ?? "");
+    return resposta(req, 502, { erro: "A leitura automática não conseguiu classificar este arquivo. Preencha manualmente." });
+  }
 
   // ---- revalidação no servidor ----
   const cat = categorias.find((c) => c.codigo === uso.categoria_codigo) ?? categorias.find((c) => c.codigo === "outros")!;
