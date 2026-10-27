@@ -170,7 +170,7 @@ const SECOES: Secao[] = [
   /* ---------------- Pessoas ---------------- */
   {
     id: "painel", titulo: "Painel de indicadores", icone: LayoutDashboard, grupo: "Pessoas",
-    palavras: "painel dashboard indicadores números ativos admissões desligamentos documentos vencidos loja filtro",
+    palavras: "painel dashboard indicadores números ativos admissões desligamentos documentos vencidos loja filtro avisos experiência férias vencer aniversário aniversariantes",
     mostrar: (c) => c.pode("dashboard.ver") || c.pode("colaborador.ler"),
     conteudo: () => (
       <>
@@ -183,6 +183,12 @@ const SECOES: Secao[] = [
           ["Aguardando assinatura", "Documentos marcados como pendentes de assinatura."],
           ["Vencem em 30 dias / Vencidos", "Documentos com data de vencimento (ex.: ASO) próxima ou passada."],
           ["Ativos por loja / Vínculos por status", "Distribuição da equipe."],
+        ]} />
+        <T>Avisos</T>
+        <Quadro cabecalho={["Aviso", "Quando aparece"]} linhas={[
+          ["Período de experiência", "Contrato de experiência cujo 1º período (45 dias) ou prorrogação (90 dias no total) termina nos próximos 15 dias. Decida antes: prorrogar, efetivar ou encerrar."],
+          ["Férias a vencer", "Período aquisitivo completo com saldo de férias e prazo (período concessivo) terminando nos próximos 90 dias. “Sair até” é o último dia para começar o saldo sem pagar em dobro. Conta as férias gozadas e programadas registradas na linha do tempo."],
+          ["Aniversariantes", "Aniversários dos próximos 30 dias. Mostra só o dia e o mês (sem idade)."],
         ]} />
         <P>Use o seletor <Menu>Loja</Menu> no topo para ver uma unidade específica (aparece se você tem acesso a mais de uma).</P>
         <Dica>Painel vazio? Ainda não há colaboradores cadastrados nas suas lojas. O próprio painel mostra o atalho para começar.</Dica>

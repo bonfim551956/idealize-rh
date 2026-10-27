@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 import { useLojas } from "../lib/dados";
 import { STATUS_VINCULO, dataHora } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
+import { PainelAvisos } from "./PainelAvisos";
 import { Botao, CabecalhoPagina, Cartao, Carregando, EstadoErro, EstadoVazio, Selecao, Selo } from "../ui/componentes";
 
 type Resumo = {
@@ -82,6 +83,8 @@ export function Painel() {
             <Indicador rotulo="Documentos vencidos" valor={q.data.documentos_vencidos} icone={AlertCircle} destaque />
           </div>
 
+          <PainelAvisos loja={loja} />
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Cartao titulo="Ativos por loja">
               <ul className="flex flex-col gap-3">
@@ -107,7 +110,7 @@ export function Painel() {
             </Cartao>
           </div>
           <p className="text-xs text-texto-suave">
-            Rotatividade, férias, afastamentos, exames e ponto entram no painel com os módulos da Etapa 2.
+            Rotatividade, afastamentos, exames e ponto entram no painel com os módulos da Etapa 2.
           </p>
         </div>
       )}
