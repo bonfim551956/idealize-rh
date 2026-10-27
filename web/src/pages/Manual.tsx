@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  Archive, BookOpen, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, LayoutDashboard, Lock, Printer, ScrollText,
+  Archive, BookOpen, Bus, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, LayoutDashboard, Lock, Printer, ScrollText,
   Search, ShieldCheck, Shirt, Sparkles, Store, UserCog, UserMinus, UserPlus, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
@@ -31,7 +31,7 @@ type Secao = {
   id: string;
   titulo: string;
   icone: LucideIcon;
-  grupo: "Começando" | "Pessoas" | "Documentos" | "Uniformes" | "Administração" | "Referência";
+  grupo: "Começando" | "Pessoas" | "Documentos" | "Uniformes" | "VT e ausências" | "Administração" | "Referência";
   palavras: string;
   mostrar: (c: Ctx) => boolean;
   conteudo: (c: Ctx) => ReactNode;
@@ -515,6 +515,38 @@ const SECOES: Secao[] = [
     ),
   },
 
+  /* ---------------- VT e ausências ---------------- */
+  {
+    id: "vale-transporte", titulo: "Vale-transporte e ausências", icone: Bus, grupo: "VT e ausências",
+    palavras: "vale transporte vt passagem ônibus valor diário dias úteis falta injustificada atestado afastamento licença férias declaração horas desconto fechamento mês exportar excel",
+    mostrar: (c) => c.pode("vt.ler") || c.pode("ausencia.ler"),
+    conteudo: (c) => (
+      <>
+        <P>O VT é pago <B>antecipado</B>: o pagamento de um mês cobre os dias daquele mês e desconta as ausências do mês anterior.</P>
+        <T>Como o valor é calculado</T>
+        <Quadro cabecalho={["Item", "Regra"]} linhas={[
+          ["Dias do mês", "Todos os dias, menos domingos, 25/12 e 01/01. Quem entra ou sai no meio do mês recebe só os dias em que estava na empresa."],
+          ["Férias, afastamentos e licenças do mês", "Se já estão registrados, saem do próprio mês."],
+          ["Desconto do mês anterior", "Faltas injustificadas, atestados, afastamentos, licenças e férias do mês anterior que ainda não tinham sido tirados."],
+          ["Declaração de horas", "Fica registrada, mas não desconta."],
+          ["Valor", "Dias a pagar × valor diário do colaborador (cadastro do VT)."],
+        ]} />
+        <T>Rotina do mês</T>
+        <Passos itens={[
+          <>Durante o mês, registre as ausências em <Menu>VT e ausências → Ausências → Registrar ausência</Menu> (falta, atestado, afastamento, licença, férias ou declaração de horas).</>,
+          <>No fim do mês, abra <Menu>Cálculo do mês</Menu> e escolha o <B>mês do pagamento</B> (o próximo). Confira a prévia; quem está sem cadastro de VT aparece em destaque.</>,
+          <>Clique em <Menu>Exportar (Excel)</Menu> para a planilha de pagamento e em <Menu>Fechar mês</Menu> para gravar o que foi pago.</>,
+        ]} />
+        <Dica>O fechamento evita descontar a mesma ausência duas vezes: férias já tiradas no pagamento de um mês não são descontadas de novo no seguinte.</Dica>
+        {c.pode("vt.gerir") && <>
+          <T>Cadastro do VT</T>
+          <P>Em <Menu>Cadastro do VT</Menu>, informe para cada colaborador se recebe VT e o <B>valor diário</B> (ida e volta). Quem não recebe (ex.: home office) fica marcado como “Não”.</P>
+        </>}
+        <Atencao>Em atestados, afastamentos e licenças, <B>não escreva diagnóstico nem CID</B>. O documento vai em Documentos (categoria Atestados médicos ou Afastamentos e licenças). Ausência lançada errado é <B>cancelada com motivo</B>, não apagada.</Atencao>
+        <P>O desconto de até 6% do salário não é calculado aqui: fica com a folha.</P>
+      </>
+    ),
+  },
   /* ---------------- Uniformes ---------------- */
   {
     id: "uniformes", titulo: "Controle de uniformes", icone: Shirt, grupo: "Uniformes",
@@ -749,7 +781,7 @@ function SeuAcesso() {
 /* =====================================================================
    Página
    ===================================================================== */
-const GRUPOS: Secao["grupo"][] = ["Começando", "Pessoas", "Documentos", "Uniformes", "Administração", "Referência"];
+const GRUPOS: Secao["grupo"][] = ["Começando", "Pessoas", "Documentos", "Uniformes", "VT e ausências", "Administração", "Referência"];
 
 export function Manual() {
   const { pode, permissoes, lojasCom } = useAuth();
