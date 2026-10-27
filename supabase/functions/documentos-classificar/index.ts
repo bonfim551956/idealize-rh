@@ -5,7 +5,7 @@
 // Segurança:
 //  * só usuários com permissão de enviar algum documento podem usar
 //  * o conteúdo do documento é tratado como DADO (nunca como instrução)
-//  * a resposta é forçada por ferramenta com categorias em lista fechada
+//  * a resposta vem por ferramenta com categorias em lista fechada
 //    e revalidada aqui (categoria, datas, CPF)
 //  * o colaborador é localizado NO NOSSO BANCO, respeitando o acesso por loja
 //  * cada sugestão é registrada na auditoria (sem o conteúdo do documento)
