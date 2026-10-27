@@ -10,6 +10,7 @@ import { useAuth } from "../auth/AuthProvider";
 import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, cx, useAvisos } from "../ui/componentes";
 import { ListaDocumentos } from "./Documentos";
 import { UniformesColaborador } from "./Uniformes";
+import { EquipamentosColaborador } from "./Equipamentos";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
 
@@ -34,6 +35,7 @@ export function Ficha() {
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
     { valor: "uniformes", rotulo: "Uniformes", visivel: pode("uniforme.ler", loja), conteudo: <UniformesColaborador c={c} /> },
+    { valor: "equipamentos", rotulo: "Equipamentos", visivel: pode("equipamento.ler", loja), conteudo: <EquipamentosColaborador c={c} /> },
     { valor: "timeline", rotulo: "Linha do tempo", visivel: true, conteudo: <LinhaDoTempo c={c} /> },
   ];
 

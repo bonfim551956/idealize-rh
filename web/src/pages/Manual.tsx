@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  Archive, BookOpen, Bus, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, LayoutDashboard, Lock, Printer, ScrollText,
+  Archive, BookOpen, Bus, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, Laptop, LayoutDashboard, Lock, Printer, ScrollText,
   Search, ShieldCheck, Shirt, Sparkles, Store, UserCog, UserMinus, UserPlus, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
@@ -515,6 +515,31 @@ const SECOES: Secao[] = [
     ),
   },
 
+  /* ---------------- Equipamentos ---------------- */
+  {
+    id: "equipamentos", titulo: "Equipamentos sob responsabilidade", icone: Laptop, grupo: "Pessoas",
+    palavras: "equipamento celular notebook chip linha tablet crachá chave máquina cartão termo responsabilidade comodato entrega devolução patrimônio imei",
+    mostrar: (c) => c.pode("equipamento.ler"),
+    conteudo: (c) => (
+      <>
+        <P>Na ficha do colaborador, a aba <Menu>Equipamentos</Menu> mostra o que está sob responsabilidade dele (celular, chip, notebook, crachá, chaves etc.), desde quando e o termo assinado.</P>
+        {c.pode("equipamento.gerir") && <>
+          <T>Entregar equipamentos</T>
+          <Passos itens={[
+            <>Abra a ficha da pessoa, aba <Menu>Equipamentos</Menu>, e clique em <Menu>Entregar equipamentos</Menu>.</>,
+            <>Informe a data e cada equipamento: nome, marca/modelo e identificação (patrimônio, número de série, IMEI ou linha). Use <B>Adicionar outro equipamento</B> para entregar vários de uma vez.</>,
+            <>Clique em <Menu>Imprimir termo para assinar</Menu>: o termo sai preenchido com os dados da pessoa e a lista de equipamentos.</>,
+            <>Anexe o termo assinado (PDF ou foto) e clique em <Menu>Registrar entrega</Menu>. Se ainda não tiver o termo, registre assim mesmo e use <Menu>Anexar termo</Menu> depois.</>,
+          ]} />
+          <T>Devolução</T>
+          <P>Clique em <Menu>Devolução</Menu> na linha do equipamento, informe a data e o estado (bom, danificado ou extraviado). Dano ou extravio exigem descrição.</P>
+          <Dica>Lançou errado? Use o ícone de <B>cancelar</B> com o motivo. Nada é apagado: tudo fica no histórico e na linha do tempo.</Dica>
+          <Atencao>No desligamento, a aba avisa se ainda há equipamentos com a pessoa. Registre a devolução antes de concluir.</Atencao>
+        </>}
+        <P>O termo também fica em <Menu>Documentos</Menu>, na categoria “Termos de responsabilidade de equipamentos”.</P>
+      </>
+    ),
+  },
   /* ---------------- VT e ausências ---------------- */
   {
     id: "vale-transporte", titulo: "Vale-transporte e ausências", icone: Bus, grupo: "VT e ausências",
