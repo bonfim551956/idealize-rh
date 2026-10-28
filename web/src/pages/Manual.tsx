@@ -243,12 +243,13 @@ const SECOES: Secao[] = [
   },
   {
     id: "cadastrar", titulo: "Cadastrar colaborador", icone: UserPlus, grupo: "Pessoas",
-    palavras: "novo cadastro cadastrar admissão pré-admissão contratado matrícula cpf tipo vínculo jornada escala salário",
+    palavras: "novo cadastro cadastrar admissão ficha de admissão leitura automática pré-admissão contratado matrícula cpf tipo vínculo jornada escala salário",
     mostrar: (c) => c.pode("colaborador.criar"),
     conteudo: (c) => (
       <>
         <Passos itens={[
           <>Em <Menu>Colaboradores</Menu>, clique em <Menu>Novo colaborador</Menu>.</>,
+          <><B>Pela ficha de admissão (opcional)</B>: clique em <Menu>Enviar ficha</Menu> e escolha o PDF ou a foto da ficha. A leitura automática preenche o formulário e marca com ✓ cada campo lido. Confira tudo, complete o que faltar (ex.: matrícula) e só então cadastre. A ficha é anexada aos documentos do colaborador.</>,
           <><B>Dados pessoais</B>: nome completo e CPF são obrigatórios. Nome social só se a pessoa usar. Endereço e contato de emergência podem ser preenchidos depois, na ficha.</>,
           <><B>Vínculo</B>: escolha a loja, a matrícula, o tipo de vínculo e a situação inicial (veja abaixo).</>,
           <>Preencha cargo, jornada semanal e escala.{c.pode("remuneracao.gerir") && <> Se for o caso, informe o <B>salário contratual</B>.</>}</>,
