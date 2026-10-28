@@ -7,6 +7,7 @@ import { useLojas } from "../lib/dados";
 import { STATUS_VINCULO, dataHora } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
 import { PainelAvisos } from "./PainelAvisos";
+import { PainelPendencias } from "./PainelPendencias";
 import { Botao, CabecalhoPagina, Cartao, Carregando, EstadoErro, EstadoVazio, Selecao, Selo } from "../ui/componentes";
 
 type Resumo = {
@@ -69,6 +70,8 @@ export function Painel() {
 
       {q.data && !semColaboradores && (
         <div className="flex flex-col gap-6">
+          <PainelPendencias loja={loja} />
+
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Indicador rotulo="Colaboradores ativos" valor={q.data.colaboradores_ativos} icone={Users} />
             <Indicador rotulo="Admissões (12 meses)" valor={q.data.admissoes_12m} icone={UserPlus} />

@@ -170,11 +170,29 @@ const SECOES: Secao[] = [
   /* ---------------- Pessoas ---------------- */
   {
     id: "painel", titulo: "Painel de indicadores", icone: LayoutDashboard, grupo: "Pessoas",
-    palavras: "painel dashboard indicadores números ativos admissões desligamentos documentos vencidos loja filtro avisos experiência férias vencer aniversário aniversariantes",
+    palavras: "painel dashboard indicadores números ativos admissões desligamentos documentos vencidos loja filtro pendências pendencias avisos experiência férias vencer aniversário aniversariantes",
     mostrar: (c) => c.pode("dashboard.ver") || c.pode("colaborador.ler"),
     conteudo: () => (
       <>
         <P>O Painel mostra números <B>reais</B>, calculados na hora a partir do cadastro — nada é digitado à mão. Você só vê os números das lojas do seu acesso.</P>
+        <T>Pendências do RH</T>
+        <P>O primeiro quadro do Painel junta tudo o que está esperando uma ação do RH, da mais urgente para a de rotina. Clique na linha para ver os nomes; o link à direita leva à tela onde se resolve. Cada pessoa só vê as pendências que a sua permissão e as suas lojas alcançam.</P>
+        <Quadro cabecalho={["Pendência", "Quando aparece"]} linhas={[
+          ["Contratos de experiência", "Experiência terminando em 7 dias ou já encerrada sem atualizar o contrato (urgente)."],
+          ["Documentos aguardando conferência", "Documentos enviados ainda não aprovados nem reprovados."],
+          ["Documentos vencidos / vencendo em 30 dias", "Documentos com vencimento (ex.: ASO) passado ou próximo, sem uma versão mais nova enviada."],
+          ["Férias a vencer", "Saldo de férias com prazo terminando nos próximos 90 dias (urgente se já venceu)."],
+          ["Desligamentos em andamento", "Desligamentos iniciados e ainda não concluídos."],
+          ["Admissões em aberto", "Cadastros em pré-admissão ou em admissão."],
+          ["Equipamentos sem termo assinado", "Equipamentos entregues sem o termo anexado."],
+          ["Devoluções pendentes", "Desligados que ainda estão com equipamento ou uniforme em mãos (urgente)."],
+          ["Sem cadastro de vale-transporte", "Colaboradores ativos sem informar se recebem VT e o valor."],
+          ["Fechar o VT do mês", "A partir do dia 20, enquanto o VT do mês seguinte não for fechado."],
+          ["Uniformes abaixo do mínimo", "Peças com estoque menor que o mínimo."],
+          ["Convites de acesso não ativados", "Pessoas convidadas que ainda não criaram a senha."],
+          ["Tarefas abertas", "Tarefas em aberto ou em andamento."],
+        ]} />
+        <T>Indicadores</T>
         <Quadro cabecalho={["Indicador", "O que conta"]} linhas={[
           ["Colaboradores ativos", "Vínculos ativos, em férias, afastados ou em licença."],
           ["Admissões / Desligamentos (12 meses)", "Datas de admissão e de desligamento nos últimos 12 meses."],
