@@ -45,8 +45,8 @@ function Lista<T extends { colaborador_id: string }>({ titulo, icone: Icone, vaz
 function Nome({ id, nome, loja }: { id: string; nome: string; loja: string }) {
   return (
     <div className="min-w-0">
-      <Link to={`/colaboradores/${id}`} className="block truncate font-medium hover:text-primaria hover:underline">{nome}</Link>
-      <p className="truncate text-xs text-texto-suave">{loja}</p>
+      <Link to={`/colaboradores/${id}`} className="block break-words font-medium leading-tight hover:text-primaria hover:underline">{nome}</Link>
+      <p className="text-xs text-texto-suave">{loja.replace(/^ÓTICAS IDEALIZE /, "")}</p>
     </div>
   );
 }
@@ -70,10 +70,12 @@ export function PainelAvisos({ loja }: { loja: string }) {
         vazio="Nenhum contrato de experiência terminando nos próximos 7 dias."
         rodape="Regra do cargo: 15 + 15 dias (consultores: 15 + 30). Decida antes do fim: prorrogar, efetivar ou encerrar. “Encerrada” = o prazo passou e o cadastro ainda está como experiência."
         render={(e) => (
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2">
             <Nome id={e.colaborador_id} nome={e.nome} loja={e.loja} />
-            <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-              {e.fase === "vencido" ? <Selo tom="perigo">Atualizar contrato</Selo> : prazo(e.dias)}
+            <div className="flex flex-wrap items-center gap-2">
+              {e.fase === "vencido"
+                ? <Link to={`/colaboradores/${e.colaborador_id}`} title="Abrir a ficha para efetivar o contrato"><Selo tom="perigo">Atualizar contrato →</Selo></Link>
+                : prazo(e.dias)}
               <span className="text-xs text-texto-suave">
                 {e.fase === "primeiro" ? `1º período (${e.regra}) termina ${data(e.termina_em)}`
                   : e.fase === "prorrogacao" ? `Prorrogação (${e.regra}) termina ${data(e.termina_em)}`

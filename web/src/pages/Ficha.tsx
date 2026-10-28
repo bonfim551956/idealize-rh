@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
-import { ArrowLeft, ArrowRightLeft, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useLojas, type ColaboradorLinha } from "../lib/dados";
 import { SIGILO, STATUS_VINCULO, TIPOS_VINCULO, data, dataHora, hoje, mascaraCpf, mascaraTelefone, moeda, so_digitos } from "../lib/formato";
@@ -76,7 +76,7 @@ function Linha({ rotulo, children }: { rotulo: string; children: ReactNode }) {
 function VisaoGeral({ c }: { c: ColaboradorLinha }) {
   const { pode } = useAuth();
   const loja = c.loja_atual_id;
-  const [acao, setAcao] = useState<"transferir" | "status" | "cargo" | "salario" | "desligar" | "concluir" | "editar" | null>(null);
+  const [acao, setAcao] = useState<"transferir" | "status" | "cargo" | "salario" | "desligar" | "concluir" | "editar" | "efetivar" | null>(null);
   const encerrado = c.status === "desligado" || c.status === "arquivado";
 
   const desligamento = useQuery({
@@ -87,6 +87,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
   });
 
   const botoes = [
+    { k: "efetivar" as const, rotulo: "Efetivar contrato (fim da experiência)", icone: BadgeCheck, ok: pode("colaborador.editar", loja) && !encerrado && c.tipo === "clt_experiencia" && c.status !== "em_desligamento" },
     { k: "editar" as const, rotulo: "Editar dados do vínculo", icone: Pencil, ok: pode("colaborador.editar", loja) && !encerrado },
     { k: "status" as const, rotulo: "Mudar situação", icone: Workflow, ok: pode("vinculo.status.alterar", loja) && !encerrado },
     { k: "transferir" as const, rotulo: "Transferir de loja", icone: ArrowRightLeft, ok: pode("colaborador.transferir", loja) && !encerrado },
@@ -127,6 +128,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
         </div>
       </Cartao>
 
+      {acao === "efetivar" && <EfetivarContrato c={c} fechar={() => setAcao(null)} />}
       {acao === "editar" && <EditarVinculo c={c} fechar={() => setAcao(null)} />}
       {acao === "status" && <MudarStatus c={c} fechar={() => setAcao(null)} />}
       {acao === "transferir" && <Transferir c={c} fechar={() => setAcao(null)} />}
@@ -177,6 +179,24 @@ function Rodape({ fechar, carregando, texto = "Salvar", desabilitado }: { fechar
       <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
       <Botao type="submit" carregando={carregando} disabled={desabilitado}>{texto}</Botao>
     </div>
+  );
+}
+
+function EfetivarContrato({ c, fechar }: { c: ColaboradorLinha; fechar: () => void }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ data: hoje(), obs: "" });
+  const m = useMutation(useAcao(c, fechar, "Contrato efetivado: prazo indeterminado.")(() =>
+    supabase.rpc("efetivar_contrato", { p_vinculo: c.vinculo_id, p_data: f.data, p_observacao: f.obs || null })));
+  const ok = !!f.data && !!c.data_admissao && f.data > c.data_admissao;
+  return (
+    <Modal aberto aoFechar={fechar} titulo="Efetivar contrato" descricao="O contrato de experiência passa a ser por prazo indeterminado a partir da data informada.">
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(undefined, { onSuccess: () => qc.invalidateQueries({ queryKey: ["painel-avisos"] }) }); }} className="flex flex-col gap-4">
+        <Aviso tom="info">Admissão em {data(c.data_admissao)}. Normalmente a efetivação é o dia seguinte ao fim da experiência.</Aviso>
+        <Campo rotulo="Prazo indeterminado a partir de" type="date" obrigatorio value={f.data} min={c.data_admissao ?? undefined} onChange={(e) => setF({ ...f, data: e.target.value })} />
+        <AreaTexto rotulo="Observação" value={f.obs} onChange={(e) => setF({ ...f, obs: e.target.value })} rows={2} />
+        <Rodape fechar={fechar} carregando={m.isPending} texto="Efetivar" desabilitado={!ok} />
+      </form>
+    </Modal>
   );
 }
 

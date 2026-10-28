@@ -186,7 +186,7 @@ const SECOES: Secao[] = [
         ]} />
         <T>Avisos</T>
         <Quadro cabecalho={["Aviso", "Quando aparece"]} linhas={[
-          ["Período de experiência", "Contrato de experiência cujo 1º período ou prorrogação termina nos próximos 7 dias, pela regra do cargo: 15 + 15 dias (consultores: 15 + 30). Decida antes: prorrogar, efetivar ou encerrar. Se o prazo já passou e o cadastro continua como experiência, aparece “Atualizar contrato”."],
+          ["Período de experiência", "Contrato de experiência cujo 1º período ou prorrogação termina nos próximos 7 dias, pela regra do cargo: 15 + 15 dias (consultores: 15 + 30). Decida antes: prorrogar, efetivar ou encerrar. Se o prazo já passou e o cadastro continua como experiência, aparece “Atualizar contrato”: abra a ficha e use Ações → Efetivar contrato."],
           ["Férias a vencer", "Período aquisitivo completo com saldo de férias e prazo (período concessivo) terminando nos próximos 90 dias. “Sair até” é o último dia para começar o saldo sem pagar em dobro. Conta as férias gozadas e programadas registradas na linha do tempo."],
           ["Aniversariantes", "Aniversários dos próximos 30 dias. Mostra só o dia e o mês (sem idade)."],
         ]} />
