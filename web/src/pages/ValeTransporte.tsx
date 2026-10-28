@@ -17,6 +17,7 @@ type Calculo = {
   ausencias_mes_anterior: number; ja_descontado: number; dias_desconto_anterior: number;
   dias_pagar: number; valor: number; fechado: boolean; fechado_dias: number | null; fechado_valor: number | null;
   observacao: string | null;
+  dias_calculado: number; ajuste_dias: number | null; ajuste_motivo: string | null;
 };
 type Ausencia = {
   id: string; colaborador_id: string; nome: string; loja_id: string; loja: string;
@@ -83,12 +84,65 @@ export function ValeTransporte() {
   );
 }
 
+/* ---------------- Ajuste manual de um colaborador no mês ---------------- */
+function AjusteVT({ l, mes, fechar }: { l: Calculo; mes: string; fechar: () => void }) {
+  const qc = useQueryClient();
+  const avisar = useAvisos();
+  const [dias, setDias] = useState(String(l.ajuste_dias ?? l.dias_calculado));
+  const [motivo, setMotivo] = useState(l.ajuste_motivo ?? "");
+  const n = Number(dias);
+  const valido = dias !== "" && Number.isInteger(n) && n >= 0 && n <= l.dias_base;
+  const salvar = useMutation({
+    mutationFn: async (remover: boolean) => {
+      const { error } = await supabase.rpc("vt_ajustar", { p_mes: `${mes}-01`, p_colaborador: l.colaborador_id,
+        p_dias: remover ? null : n, p_motivo: remover ? null : motivo });
+      if (error) throw error;
+      return remover;
+    },
+    onSuccess: (remover) => { qc.invalidateQueries({ queryKey: ["vt"] }); avisar("sucesso", remover ? "Ajuste removido: volta ao cálculo automático." : "Ajuste salvo."); fechar(); },
+    onError: (e) => avisar("erro", mensagemErro(e)),
+  });
+  return (
+    <Modal aberto aoFechar={fechar} titulo="Ajustar VT do mês" descricao={`${l.nome} · ${nomeMes(mes)}`}>
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); if (valido && motivo.trim().length >= 3) salvar.mutate(false); }} className="flex flex-col gap-4">
+        <div className="rounded-lg border border-borda p-3 text-sm">
+          <p className="mb-1 font-medium">Cálculo automático</p>
+          <p className="text-texto-suave">{l.dias_base} dias do mês
+            {l.dias_excluidos ? ` − ${l.dias_excluidos} de férias/afastamento no mês` : ""}
+            {l.dias_desconto_anterior ? ` − ${l.dias_desconto_anterior} de ausências do mês anterior` : ""}
+            {" = "}<b className="text-texto">{l.dias_calculado} dias · {moeda(l.dias_calculado * Number(l.valor_diario))}</b></p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <Campo rotulo="Dias a pagar neste mês" type="number" min={0} max={l.dias_base} value={dias} onChange={(e) => setDias(e.target.value)}
+            erro={dias !== "" && !valido ? `De 0 a ${l.dias_base}` : null} obrigatorio className="sm:w-48" />
+          <Botao type="button" variante="secundaria" onClick={() => setDias(String(l.dias_base))}>Mês completo ({l.dias_base})</Botao>
+        </div>
+        {valido && <p className="text-sm">Valor a pagar: <b>{moeda(n * Number(l.valor_diario))}</b>
+          {n !== l.dias_calculado && <span className="text-texto-suave"> ({n > l.dias_calculado ? "+" : "−"}{Math.abs(n - l.dias_calculado)} dias em relação ao cálculo)</span>}</p>}
+        <AreaTexto rotulo="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} obrigatorio
+          placeholder="Ex.: férias de novembro já descontadas no VT pago proporcional em outubro" />
+        <Aviso tom="info">Vale só para este mês e fica registrado com o seu nome. As ausências continuam contando como já tratadas: o mês seguinte não desconta de novo.</Aviso>
+        <div className="flex flex-wrap justify-between gap-2">
+          {l.ajuste_dias != null
+            ? <Botao type="button" variante="secundaria" carregando={salvar.isPending && salvar.variables === true} onClick={() => salvar.mutate(true)}>Remover ajuste</Botao>
+            : <span />}
+          <div className="flex gap-2">
+            <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
+            <Botao type="submit" carregando={salvar.isPending && salvar.variables === false} disabled={!valido || motivo.trim().length < 3}>Salvar ajuste</Botao>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 /* ---------------- Cálculo do mês ---------------- */
 function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) => void; loja: string }) {
   const { pode } = useAuth();
   const qc = useQueryClient();
   const avisar = useAvisos();
   const [confirmar, setConfirmar] = useState(false);
+  const [ajustando, setAjustando] = useState<Calculo | null>(null);
   const q = useQuery({
     queryKey: ["vt", "calculo", mes, loja],
     queryFn: async () => {
@@ -156,7 +210,7 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
         )}
         <Cartao>
           {recebem.length === 0 ? <EstadoVazio titulo="Ninguém com VT neste mês" descricao="Cadastre o valor diário na aba “Cadastro do VT”." /> : (
-            <Tabela cabecalho={["Colaborador", "R$/dia", "Dias do mês", "Férias/afast. no mês", `Desconto de ${nomeMes(mesAnterior(mes)).split(" ")[0]}`, "Dias a pagar", "Valor"]}>
+            <Tabela cabecalho={["Colaborador", "R$/dia", "Dias do mês", "Férias/afast. no mês", `Desconto de ${nomeMes(mesAnterior(mes)).split(" ")[0]}`, "Dias a pagar", "Valor", ""]}>
               {recebem.map((l) => (
                 <tr key={l.colaborador_id} className="align-top hover:bg-fundo">
                   <td className="px-4 py-3">
@@ -171,11 +225,22 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
                     {l.dias_desconto_anterior ? `−${l.dias_desconto_anterior}` : "—"}
                     {l.ja_descontado > 0 && <p className="text-xs text-texto-suave">{l.ja_descontado} já tirado(s) antes</p>}
                   </td>
-                  <td className="px-4 py-3 font-medium tabular-nums">{l.dias_pagar}</td>
+                  <td className="px-4 py-3 font-medium tabular-nums">
+                    {l.dias_pagar}
+                    {l.ajuste_dias != null && (
+                      <span className="mt-1 block" title={l.ajuste_motivo ?? ""}><Selo tom="info">Ajuste manual</Selo>
+                        <span className="mt-0.5 block text-xs font-normal text-texto-suave">calculado: {l.dias_calculado}</span></span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-medium tabular-nums">
                     {moeda(l.valor)}
                     {l.fechado && Number(l.fechado_valor) !== Number(l.valor) && (
                       <p className="text-xs text-alerta">Fechado: {moeda(l.fechado_valor)} ({l.fechado_dias} dias)</p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {pode("vt.gerir", l.loja_id) && !l.fechado && (
+                      <Botao tamanho="sm" variante="secundaria" icone={<Pencil className="size-4" />} onClick={() => setAjustando(l)}>Ajustar</Botao>
                     )}
                   </td>
                 </tr>
@@ -183,7 +248,9 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
             </Tabela>
           )}
         </Cartao>
+        {ajustando && <AjusteVT l={ajustando} mes={mes} fechar={() => setAjustando(null)} />}
         <p className="text-xs text-texto-suave">
+          “Ajustar” troca os dias a pagar de uma pessoa neste mês (ex.: férias que já foram pagas proporcionais), com motivo registrado.
           “Férias/afast. no mês” são férias, afastamentos e licenças já registrados para este mês (saem do próprio mês).
           “Desconto” são as ausências do mês anterior que ainda não tinham sido tiradas. Declaração de horas não desconta.
         </p>
