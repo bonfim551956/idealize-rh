@@ -35,6 +35,8 @@ do $$ declare j jsonb := public.ferias_programacao(); p jsonb; begin
     then raise exception 'FALHOU programada: %', j; end if;
   if exists (select 1 from jsonb_array_elements(public.painel_pendencias()->'pendencias') x where x->>'chave'='ferias')
     then raise exception 'FALHOU pendência deveria sumir'; end if;
+  if exists (select 1 from jsonb_array_elements(public.painel_pendencias()->'pendencias') x where x->>'chave'='ferias_pagar')
+    then raise exception 'FALHOU pagar férias antes da janela de 15 dias'; end if;
   begin perform public.ferias_lancar(jsonb_build_object('colaborador_id', current_setting('teste.th'), 'modo','datas',
       'aquisitivo_inicio', p->>'aquisitivo_inicio', 'data_inicio', (current_date + 90)::text, 'dias', 5));
     raise exception 'FALHOU passou do saldo';
@@ -46,7 +48,19 @@ do $$ declare j jsonb := public.ferias_programacao(); p jsonb; begin
   if (select abono_dias from public.ausencias where colaborador_id = current_setting('teste.th')::uuid) <> 10 then raise exception 'FALHOU abono'; end if;
   raise notice 'ok  - quitação, programação com abono, limites de saldo';
 end $$;
--- gerente vê mas não lança
+-- férias daqui a 10 dias: aparece o pagamento
+select public.ferias_lancar(jsonb_build_object('colaborador_id',:'th','modo','datas',
+  'aquisitivo_inicio',(current_date - interval '1 years' + interval '3 days')::date::text,
+  'data_inicio',(current_date + 10)::text,'dias',5,'abono',0));
+do $$ begin
+  if not exists (select 1 from jsonb_array_elements(public.painel_pendencias()->'pendencias') x
+                  where x->>'chave'='ferias_pagar' and (x->>'quantidade')::int = 1 and x->'itens'->0->>'detalhe' like '%pagar até%')
+    then raise exception 'FALHOU pagar férias: %', public.painel_pendencias(); end if;
+  if extract(isodow from privado.prazo_pagamento_ferias(date '2026-12-14')) <> 5 or privado.prazo_pagamento_ferias(date '2026-12-14') <> date '2026-12-11'
+    then raise exception 'FALHOU prazo no fim de semana'; end if;
+  raise notice 'ok  - aviso de pagamento 15 dias antes, prazo volta para sexta';
+end $$;
+
 select set_config('request.jwt.claims', json_build_object('sub',:'ger','aal','aal2')::text, true);
 do $$ begin
   if jsonb_array_length(public.ferias_programacao()) <> 2 then raise exception 'FALHOU gerente não vê'; end if;
