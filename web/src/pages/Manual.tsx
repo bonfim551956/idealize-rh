@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
-  Archive, BookOpen, Bus, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, Laptop, LayoutDashboard, Lock, Printer, ScrollText,
+  Archive, BookOpen, Bus, CheckCircle2, ClipboardList, FileText, HelpCircle, KeyRound, Laptop, LayoutDashboard, Lock, Palmtree, Printer, ScrollText,
   Search, ShieldCheck, Shirt, Sparkles, Store, UserCog, UserMinus, UserPlus, Users, Wallet, type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
@@ -555,6 +555,35 @@ const SECOES: Secao[] = [
           <Atencao>No desligamento, a aba avisa se ainda há equipamentos com a pessoa. Registre a devolução antes de concluir.</Atencao>
         </>}
         <P>O termo também fica em <Menu>Documentos</Menu>, na categoria “Termos de responsabilidade de equipamentos”.</P>
+      </>
+    ),
+  },
+  /* ---------------- Férias ---------------- */
+  {
+    id: "ferias", titulo: "Férias", icone: Palmtree, grupo: "VT e ausências",
+    palavras: "férias ferias período aquisitivo concessivo limite gozo saldo abono vender dias programar programação quitado contabilidade dobro vencida",
+    mostrar: (c) => c.pode("colaborador.ler"),
+    conteudo: () => (
+      <>
+        <P>Em <Menu>Férias</Menu> aparecem os períodos aquisitivos em aberto de cada colaborador, no mesmo formato da programação de férias da contabilidade. Nada precisa ser digitado para quem é admitido: o sistema calcula os períodos a partir da data de admissão.</P>
+        <Quadro cabecalho={["Coluna", "O que significa"]} linhas={[
+          ["Direito", "2,5 dias por mês trabalhado no período (fração de 15 dias ou mais conta como mês); 30 no período completo."],
+          ["Gozados / Saldo", "Dias já tirados (e abono) e o que falta."],
+          ["Limite p/ gozo", "Último dia para começar as férias dentro do período concessivo. Depois disso, as férias são pagas em dobro."],
+          ["Programação", "Próximas férias lançadas, com dias de descanso e abono."],
+        ]} />
+        <Quadro cabecalho={["Situação", "Quando"]} linhas={[
+          ["Vencida", "Passou do limite sem lançar as férias (aparece como urgente nas Pendências do Painel)."],
+          ["Limite em até 90 dias", "Período completo com limite chegando (também aparece nas Pendências)."],
+          ["A programar", "Período completo, ainda com saldo para programar."],
+          ["Programada", "Todo o saldo já tem data."],
+          ["Em aquisição", "Período ainda em andamento."],
+        ]} />
+        <T>Lançar férias</T>
+        <P>Clique em <Menu>Lançar</Menu> na linha do período e escolha:</P>
+        <P><B>Férias com datas</B> — início, dias de descanso (5 a 30) e abono (dias vendidos, até 1/3). O sistema mostra o último dia e o retorno, não deixa passar do saldo e avisa se o início passa do limite. As férias entram na linha do tempo e descontam do vale-transporte.</P>
+        <P><B>Período já quitado, sem as datas</B> — para férias tiradas antes do sistema, conforme o relatório da contabilidade. O período sai da lista.</P>
+        <Dica>Só diretoria, RH e DP lançam; gerentes e supervisores apenas consultam. Para corrigir férias lançadas com datas erradas, cancele a ausência em VT e ausências → Ausências e lance de novo.</Dica>
       </>
     ),
   },
