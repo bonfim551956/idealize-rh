@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
 import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
@@ -11,12 +11,16 @@ import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, EstadoErro, EstadoV
 import { ListaDocumentos } from "./Documentos";
 import { UniformesColaborador } from "./Uniformes";
 import { EquipamentosColaborador } from "./Equipamentos";
+import { ChecklistAdmissao, ITENS_ADMISSAO, useChecklistAdmissao } from "./ChecklistAdmissao";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
 
 export function Ficha() {
   const { id } = useParams<{ id: string }>();
   const { pode } = useAuth();
+  const [params] = useSearchParams();
+  const [aba, setAba] = useState(params.get("aba") ?? "geral");
+  const checklist = useChecklistAdmissao(id);
   const q = useQuery({
     queryKey: ["colaborador", id],
     queryFn: async () => falhar(await supabase.from("v_colaboradores").select("*").eq("id", id!).maybeSingle()) as ColaboradorLinha | null,
@@ -31,6 +35,8 @@ export function Ficha() {
 
   const abas: { valor: string; rotulo: string; visivel: boolean; conteudo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral", visivel: true, conteudo: <VisaoGeral c={c} /> },
+    { valor: "admissao", rotulo: checklist.data ? `Admissão (${checklist.data.filter((i) => i.concluido).length}/${ITENS_ADMISSAO.length})` : "Admissão",
+      visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={setAba} /> },
     { valor: "pessoais", rotulo: "Dados pessoais", visivel: pode("colaborador.dados_pessoais.ler", loja), conteudo: <DadosPessoais c={c} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
@@ -52,7 +58,7 @@ export function Ficha() {
         {status && <Selo tom={status.tom}>{status.rotulo}</Selo>}
       </div>
 
-      <Tabs.Root defaultValue="geral">
+      <Tabs.Root value={aba} onValueChange={setAba}>
         <Tabs.List className="mb-6 flex gap-1 overflow-x-auto border-b border-borda" aria-label="Seções da ficha">
           {abas.filter((a) => a.visivel).map((a) => (
             <Tabs.Trigger key={a.valor} value={a.valor}
