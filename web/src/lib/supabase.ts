@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { embutidoNoCentral } from "./central";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -7,8 +8,11 @@ if (!url || !chave) {
   throw new Error("Configuração ausente: defina VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.");
 }
 
+// Dentro do Central Idealize a sessão vem do Central (só em memória, sem renovação própria)
 export const supabase = createClient(url, chave, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  auth: embutidoNoCentral
+    ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    : { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
 
 export const SUPABASE_URL = url;

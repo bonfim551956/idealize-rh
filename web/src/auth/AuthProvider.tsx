@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { conectarAoCentral, embutidoNoCentral, pedirSaidaAoCentral } from "../lib/central";
 
 export type Permissao = { permissao: string; loja_id: string | null; exige_mfa: boolean; liberada_na_sessao: boolean };
 export type EstadoMfa = "ok" | "cadastrar" | "verificar";
@@ -75,6 +76,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let ativo = true;
+    // Dentro do Central Idealize: a sessão chega do Central (e é renovada por ele)
+    if (embutidoNoCentral) {
+      const limite = window.setTimeout(() => { if (ativo) setCarregando(false); }, 6000);
+      const desconectar = conectarAoCentral(
+        async (token) => {
+          const { data, error } = await supabase.auth.setSession({ access_token: token, refresh_token: "central" });
+          if (!ativo) return;
+          if (error) { window.clearTimeout(limite); setCarregando(false); return; }
+          setSessao(data.session);
+          await carregarContexto(data.session);
+          window.clearTimeout(limite);
+          setCarregando(false);
+        },
+        () => { supabase.auth.signOut({ scope: "local" }); },
+      );
+      const { data: sub } = supabase.auth.onAuthStateChange((evento, s) => {
+        if (evento === "SIGNED_OUT") { setSessao(null); carregarContexto(null); }
+        if (evento === "MFA_CHALLENGE_VERIFIED" || evento === "USER_UPDATED") { setSessao(s); setTimeout(() => carregarContexto(s), 0); }
+      });
+      return () => { ativo = false; window.clearTimeout(limite); desconectar(); sub.subscription.unsubscribe(); };
+    }
     supabase.auth.getSession().then(async ({ data }) => {
       if (!ativo) return;
       // sessão guardada de uma aba fechada há mais de 20 min: encerra antes de abrir
@@ -104,7 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Encerramento por inatividade
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (!sessao) return;
+    // dentro do Central, quem encerra por inatividade é o Central
+    if (!sessao || embutidoNoCentral) return;
     // a última atividade fica gravada (vale para todas as abas e sobrevive ao fechar o navegador)
     let ultimaGravacao = 0;
     const reiniciar = () => {
@@ -137,7 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return ps.map((p) => p.loja_id!) ;
     },
     recarregar: () => carregarContexto(sessao),
-    sair: async () => { limparAtividade(); await supabase.auth.signOut(); },
+    sair: async () => {
+      limparAtividade();
+      if (embutidoNoCentral) { pedirSaidaAoCentral(); await supabase.auth.signOut({ scope: "local" }); return; }
+      await supabase.auth.signOut();
+    },
   }), [carregando, sessao, nome, permissoes, mfa, temFatorMfa, mfaObrigatorio, carregarContexto]);
 
   return <AuthCtx.Provider value={valor}>{children}</AuthCtx.Provider>;
