@@ -27,3 +27,13 @@ export function conectarAoCentral(aoReceberToken: (token: string) => void, aoSai
 export function pedirSaidaAoCentral() {
   if (embutidoNoCentral) window.parent.postMessage({ tipo: "central:sair-pedido" }, "*");
 }
+
+// Uso dentro do RH conta como atividade no Central (o Central encerra após 20 min sem uso)
+if (embutidoNoCentral) {
+  let ultimo = 0;
+  const avisar = () => {
+    const t = Date.now();
+    if (t - ultimo > 30000) { ultimo = t; window.parent.postMessage({ tipo: "central:atividade" }, "*"); }
+  };
+  (["mousedown", "keydown", "touchstart", "scroll"] as const).forEach((e) => window.addEventListener(e, avisar, { passive: true }));
+}
