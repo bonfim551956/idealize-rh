@@ -1,7 +1,6 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Tabs from "@radix-ui/react-tabs";
 import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useLojas, type ColaboradorLinha } from "../lib/dados";
@@ -19,7 +18,9 @@ export function Ficha() {
   const { id } = useParams<{ id: string }>();
   const { pode } = useAuth();
   const [params] = useSearchParams();
-  const [aba, setAba] = useState(params.get("aba") ?? "geral");
+  const abaInicial = params.get("aba");
+  const irPara = (secao: string) => document.getElementById(`secao-${secao}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  useEffect(() => { if (abaInicial) setTimeout(() => irPara(abaInicial), 400); }, [abaInicial]);
   const checklist = useChecklistAdmissao(id);
   const q = useQuery({
     queryKey: ["colaborador", id],
@@ -36,7 +37,7 @@ export function Ficha() {
   const abas: { valor: string; rotulo: string; visivel: boolean; conteudo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral", visivel: true, conteudo: <VisaoGeral c={c} /> },
     { valor: "admissao", rotulo: checklist.data ? `Admissão (${checklist.data.filter((i) => i.concluido).length}/${ITENS_ADMISSAO.length})` : "Admissão",
-      visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={setAba} /> },
+      visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={irPara} /> },
     { valor: "pessoais", rotulo: "Dados pessoais", visivel: pode("colaborador.dados_pessoais.ler", loja), conteudo: <DadosPessoais c={c} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
@@ -44,6 +45,7 @@ export function Ficha() {
     { valor: "equipamentos", rotulo: "Equipamentos", visivel: pode("equipamento.ler", loja), conteudo: <EquipamentosColaborador c={c} /> },
     { valor: "timeline", rotulo: "Linha do tempo", visivel: true, conteudo: <LinhaDoTempo c={c} /> },
   ];
+  const visiveis = abas.filter((a) => a.visivel);
 
   return (
     <>
@@ -58,17 +60,23 @@ export function Ficha() {
         {status && <Selo tom={status.tom}>{status.rotulo}</Selo>}
       </div>
 
-      <Tabs.Root value={aba} onValueChange={setAba}>
-        <Tabs.List className="mb-6 flex gap-1 overflow-x-auto border-b border-borda" aria-label="Seções da ficha">
-          {abas.filter((a) => a.visivel).map((a) => (
-            <Tabs.Trigger key={a.valor} value={a.valor}
-              className="h-10 shrink-0 border-b-2 border-transparent px-3 text-sm font-medium text-texto-suave hover:text-texto data-[state=active]:border-primaria data-[state=active]:text-primaria">
-              {a.rotulo}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        {abas.filter((a) => a.visivel).map((a) => <Tabs.Content key={a.valor} value={a.valor}>{a.conteudo}</Tabs.Content>)}
-      </Tabs.Root>
+      {/* índice fixo: leva a cada seção da página */}
+      <nav aria-label="Seções da ficha" className="sticky top-0 z-10 -mx-4 mb-6 flex gap-1 overflow-x-auto border-b border-borda bg-fundo/95 px-4 py-2 backdrop-blur sm:-mx-0 sm:px-0">
+        {visiveis.map((a) => (
+          <button key={a.valor} type="button" onClick={() => irPara(a.valor)}
+            className="h-9 shrink-0 rounded-full px-3 text-sm font-medium text-texto-suave hover:bg-superficie hover:text-texto">
+            {a.rotulo}
+          </button>
+        ))}
+      </nav>
+      <div className="flex flex-col gap-10">
+        {visiveis.map((a) => (
+          <section key={a.valor} id={`secao-${a.valor}`} aria-labelledby={`titulo-${a.valor}`} className="scroll-mt-16">
+            <h2 id={`titulo-${a.valor}`} className="mb-3 text-lg font-semibold">{a.rotulo}</h2>
+            {a.conteudo}
+          </section>
+        ))}
+      </div>
       <p className="mt-8 text-xs text-texto-suave">Contratos, exames, jornada, férias, ocorrências, treinamentos e avaliações chegam nas próximas etapas.</p>
     </>
   );
