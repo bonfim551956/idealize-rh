@@ -124,7 +124,7 @@ Hoje é ${hoje}.`;
       method: "POST",
       headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
-        model: MODELO, max_tokens: 1500, system: sistema, tools: [ferramenta], tool_choice: { type: "auto" },
+        model: MODELO, max_tokens: 3000, system: sistema, tools: [ferramenta], tool_choice: { type: "auto" },
         messages: [{ role: "user", content: [bloco, { type: "text", text: "Leia a ficha de admissão anexada chamando a ferramenta registrar_ficha. Não responda em texto." }] }],
       }),
       signal: AbortSignal.timeout(90_000),
