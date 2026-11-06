@@ -10,6 +10,7 @@ import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, EstadoErro, EstadoV
 import { ListaDocumentos } from "./Documentos";
 import { UniformesColaborador } from "./Uniformes";
 import { EquipamentosColaborador } from "./Equipamentos";
+import { FichaCompleta } from "./FichaCompleta";
 import { ChecklistAdmissao, ITENS_ADMISSAO, useChecklistAdmissao } from "./ChecklistAdmissao";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
@@ -38,7 +39,6 @@ export function Ficha() {
     { valor: "geral", rotulo: "Visão geral", visivel: true, conteudo: <VisaoGeral c={c} /> },
     { valor: "admissao", rotulo: checklist.data ? `Admissão (${checklist.data.filter((i) => i.concluido).length}/${ITENS_ADMISSAO.length})` : "Admissão",
       visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={irPara} /> },
-    { valor: "pessoais", rotulo: "Dados pessoais", visivel: pode("colaborador.dados_pessoais.ler", loja), conteudo: <DadosPessoais c={c} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
     { valor: "uniformes", rotulo: "Uniformes", visivel: pode("uniforme.ler", loja), conteudo: <UniformesColaborador c={c} /> },
@@ -112,22 +112,9 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <Cartao titulo="Vínculo atual" className="lg:col-span-2">
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <Linha rotulo="Loja">{c.loja_nome}</Linha>
-          <Linha rotulo="Cargo">{c.cargo_nome ?? "—"}</Linha>
-          <Linha rotulo="Tipo de vínculo">{c.tipo ? TIPOS_VINCULO[c.tipo] : "—"}</Linha>
-          <Linha rotulo="Matrícula">{c.matricula ?? "—"}</Linha>
-          <Linha rotulo="Admissão">{data(c.data_admissao)}</Linha>
-          <Linha rotulo="Desligamento">{data(c.data_desligamento)}</Linha>
-          <Linha rotulo="Jornada semanal">{c.jornada_semanal_horas ? `${c.jornada_semanal_horas} h` : "—"}</Linha>
-          <Linha rotulo="Escala">{c.escala ?? "—"}</Linha>
-          <Linha rotulo="CPF">{c.cpf_mascarado}</Linha>
-        </dl>
-        {pode("remuneracao.ler", loja) && <SalarioAtual vinculo={c.vinculo_id} />}
-      </Cartao>
+      <div className="lg:col-span-2"><FichaCompleta c={c} /></div>
 
-      <Cartao titulo="Ações">
+      <div><Cartao titulo="Ações" className="lg:sticky lg:top-16">
         {c.status === "em_desligamento" && desligamento.data && (
           <div className="mb-4 flex flex-col gap-2">
             <Aviso tom="alerta">Desligamento em andamento ({desligamento.data.modalidade.replace(/_/g, " ")}) desde {data(desligamento.data.data_comunicacao)}.</Aviso>
@@ -140,7 +127,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
             <Botao key={k} variante="secundaria" className="justify-start" icone={<I className="size-4" />} onClick={() => setAcao(k)}>{rotulo}</Botao>
           ))}
         </div>
-      </Cartao>
+      </Cartao></div>
 
       {acao === "efetivar" && <EfetivarContrato c={c} fechar={() => setAcao(null)} />}
       {acao === "editar" && <EditarVinculo c={c} fechar={() => setAcao(null)} />}
@@ -601,3 +588,4 @@ function LinhaDoTempo({ c }: { c: ColaboradorLinha }) {
     </Cartao>
   );
 }
+export const _naoUsadosNaPrevia = [SalarioAtual, DadosPessoais, TIPOS_VINCULO];
