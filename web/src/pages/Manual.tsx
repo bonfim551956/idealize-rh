@@ -178,7 +178,7 @@ const SECOES: Secao[] = [
         <T>Pendências do RH</T>
         <P>O primeiro quadro do Painel junta tudo o que está esperando uma ação do RH, da mais urgente para a de rotina. Clique na linha para ver os nomes; o link à direita leva à tela onde se resolve. Cada pessoa só vê as pendências que a sua permissão e as suas lojas alcançam.</P>
         <Quadro cabecalho={["Pendência", "Quando aparece"]} linhas={[
-          ["Admissões com itens obrigatórios pendentes", "Colaborador sem algum dos 5 itens da admissão: cartão VR, uniforme, crachá, termo de uso de imagem e equipamento/EPI (urgente). O nome abre a aba Admissão da ficha."],
+          ["Admissões com itens obrigatórios pendentes", "Colaborador sem algum dos 5 itens da admissão: cartão VR, uniforme, crachá, termo de uso de imagem e equipamento/EPI (urgente). O nome abre a ficha já na seção Admissão."],
           ["Contratos de experiência", "Experiência terminando em 7 dias ou já encerrada sem atualizar o contrato (urgente)."],
           ["Documentos aguardando conferência", "Documentos enviados ainda não aprovados nem reprovados."],
           ["Documentos vencidos / vencendo em 30 dias", "Documentos com vencimento (ex.: ASO) passado ou próximo, sem uma versão mais nova enviada."],
@@ -238,7 +238,7 @@ const SECOES: Secao[] = [
           [<Selo>Desligado</Selo>, "Vínculo encerrado. O cadastro e os documentos continuam guardados."],
           [<Selo>Arquivado</Selo>, "Registro encerrado e arquivado (ex.: contratação desistida)."],
         ]} />
-        <Dica>Na lista o CPF aparece mascarado (***.123.456-**). O CPF completo só aparece para perfis autorizados, na aba Dados pessoais, e cada visualização é registrada.</Dica>
+        <Dica>Na lista o CPF aparece mascarado (***.123.456-**). O CPF completo só aparece para perfis autorizados, na Visão geral da ficha (Exibir dados completos), e cada visualização é registrada.</Dica>
       </>
     ),
   },
@@ -250,7 +250,7 @@ const SECOES: Secao[] = [
       <>
         <Passos itens={[
           <>Em <Menu>Colaboradores</Menu>, clique em <Menu>Novo colaborador</Menu>.</>,
-          <><B>Itens obrigatórios</B>: depois de cadastrar, abra a aba <Menu>Admissão</Menu> da ficha e conclua os 5 itens — cartão VR e crachá com <Menu>Registrar entrega</Menu>; uniforme e equipamento/EPI pelas abas Uniformes e Equipamentos (concluem sozinhos); termo de uso de imagem com <Menu>Imprimir termo</Menu> e depois <Menu>Anexar termo assinado</Menu>.</>,
+          <><B>Itens obrigatórios</B>: depois de cadastrar, vá à seção <Menu>Admissão</Menu> da ficha e conclua os 5 itens — cartão VR e crachá com <Menu>Registrar entrega</Menu>; uniforme e equipamento/EPI pelas abas Uniformes e Equipamentos (concluem sozinhos); termo de uso de imagem com <Menu>Imprimir termo</Menu> e depois <Menu>Anexar termo assinado</Menu>.</>,
           <><B>Pela ficha de admissão (opcional)</B>: clique em <Menu>Enviar ficha</Menu> e escolha o PDF ou a foto da ficha. A leitura automática preenche o formulário e marca com ✓ cada campo lido. Confira tudo, complete o que faltar (ex.: matrícula) e só então cadastre. A ficha é anexada aos documentos do colaborador.</>,
           <><B>Dados pessoais</B>: nome completo e CPF são obrigatórios. Nome social só se a pessoa usar. Endereço e contato de emergência podem ser preenchidos depois, na ficha.</>,
           <><B>Vínculo</B>: escolha a loja, a matrícula, o tipo de vínculo e a situação inicial (veja abaixo).</>,
@@ -281,12 +281,12 @@ const SECOES: Secao[] = [
     mostrar: (c) => c.pode("colaborador.ler"),
     conteudo: (c) => (
       <>
-        <P>A ficha reúne toda a jornada do profissional. As abas que aparecem dependem do seu acesso:</P>
-        <Quadro cabecalho={["Aba", "O que mostra"]} linhas={[
-          ["Visão geral", <>Vínculo atual (loja, cargo, tipo, admissão, jornada, escala){c.pode("remuneracao.ler") && ", salário (oculto até clicar em Mostrar)"} e o quadro de <B>Ações</B>.</>],
-          ...(c.pode("colaborador.dados_pessoais.ler") ? [["Dados pessoais", "CPF completo, nascimento, contatos, endereço e contato de emergência — exibidos sob registro na auditoria."] as ReactNode[]] : []),
+        <P>A ficha é uma <B>página única</B>: as seções ficam uma embaixo da outra e a barra no topo (que acompanha a rolagem) leva direto a cada uma. As seções que aparecem dependem do seu acesso:</P>
+        <Quadro cabecalho={["Seção", "O que mostra"]} linhas={[
+          ["Visão geral", <>Todos os campos do <B>Registro de Empregado</B> da contabilidade, em blocos: <B>Contrato</B> (empregador, cargo, função, CBO, admissão, fim da experiência, jornada, horários, FGTS, departamento{c.pode("remuneracao.ler") && ", salário oculto até clicar em Mostrar"}), e — para RH, DP e diretoria, depois de clicar em <Menu>Exibir dados completos</Menu> — <B>Dados pessoais</B>, <B>Documentos</B> (RG, CTPS, PIS, título, CNH), <B>Endereço e contatos</B>, <B>Dependentes</B> e <B>Dados bancários</B>. Ao lado, o quadro de <B>Ações</B>.</>],
+          ["Admissão", "Os 5 itens obrigatórios da admissão."],
           ["Movimentações", <>Histórico de lojas (lotação), cargos e situações{c.pode("remuneracao.ler") && ", e histórico salarial"}.</>],
-          ["Documentos", "Documentos do colaborador que o seu perfil pode ver."],
+          ["Documentos, Uniformes, Equipamentos", "O que é daquele colaborador em cada módulo."],
           ["Linha do tempo", "Todos os eventos em ordem cronológica: cadastro, transferências, promoções, mudanças de situação, documentos recebidos."],
         ]} />
         <P>Na linha do tempo, o ponto <span className="font-medium text-marca">teal</span> indica evento geral e o ponto <span className="font-medium text-destaque">laranja</span> indica evento sigiloso (contratual, saúde, financeiro…). Você só vê eventos do sigilo que o seu perfil alcança.</P>
@@ -301,11 +301,11 @@ const SECOES: Secao[] = [
     conteudo: (c) => (
       <>
         <Passos itens={[
-          <>Na ficha, abra a aba <Menu>Dados pessoais</Menu>.</>,
-          <>Clique em <Menu>Exibir dados pessoais</Menu>. <B>Cada exibição fica registrada</B> na auditoria com seu nome e horário — abra só quando precisar.</>,
+          <>Na ficha, na <Menu>Visão geral</Menu>, abaixo do Contrato.</>,
+          <>Clique em <Menu>Exibir dados completos</Menu>. <B>Cada exibição fica registrada</B> na auditoria com seu nome e horário — abra só quando precisar.</>,
           ...(c.pode("colaborador.dados_pessoais.editar") ? [
-            <>Para corrigir, clique em <Menu>Editar</Menu>. Ao digitar o <B>CEP</B> e sair do campo, o endereço é preenchido automaticamente; complete número e complemento.</>,
-            <>Em <B>Contato de emergência</B>, clique em <Menu>Adicionar</Menu> e informe nome, parentesco e telefone.</>,
+            <>Cada bloco (Dados pessoais, Documentos, Endereço e contatos, Dependentes, Dados bancários) tem o seu botão <Menu>Editar</Menu>. No endereço, ao digitar o <B>CEP</B> e sair do campo, o endereço é preenchido automaticamente.</>,
+            <>Em <B>Contatos de emergência</B> (dentro de Endereço e contatos), clique em <Menu>Adicionar</Menu> e informe nome, parentesco e telefone.</>,
           ] : []),
         ]} />
         {!c.pode("colaborador.dados_pessoais.editar") && <Dica>O seu perfil pode consultar, mas não alterar dados pessoais.</Dica>}

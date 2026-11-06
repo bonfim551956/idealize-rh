@@ -1,16 +1,16 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as Tabs from "@radix-ui/react-tabs";
 import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useLojas, type ColaboradorLinha } from "../lib/dados";
-import { SIGILO, STATUS_VINCULO, TIPOS_VINCULO, data, dataHora, hoje, mascaraCpf, mascaraTelefone, moeda, so_digitos } from "../lib/formato";
+import { SIGILO, STATUS_VINCULO, data, dataHora, hoje, mascaraTelefone, moeda, so_digitos } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
 import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, cx, useAvisos } from "../ui/componentes";
 import { ListaDocumentos } from "./Documentos";
 import { UniformesColaborador } from "./Uniformes";
 import { EquipamentosColaborador } from "./Equipamentos";
+import { FichaCompleta } from "./FichaCompleta";
 import { ChecklistAdmissao, ITENS_ADMISSAO, useChecklistAdmissao } from "./ChecklistAdmissao";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
@@ -19,7 +19,9 @@ export function Ficha() {
   const { id } = useParams<{ id: string }>();
   const { pode } = useAuth();
   const [params] = useSearchParams();
-  const [aba, setAba] = useState(params.get("aba") ?? "geral");
+  const abaInicial = params.get("aba");
+  const irPara = (secao: string) => document.getElementById(`secao-${secao}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  useEffect(() => { if (abaInicial) setTimeout(() => irPara(abaInicial), 400); }, [abaInicial]);
   const checklist = useChecklistAdmissao(id);
   const q = useQuery({
     queryKey: ["colaborador", id],
@@ -36,14 +38,14 @@ export function Ficha() {
   const abas: { valor: string; rotulo: string; visivel: boolean; conteudo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral", visivel: true, conteudo: <VisaoGeral c={c} /> },
     { valor: "admissao", rotulo: checklist.data ? `Admissão (${checklist.data.filter((i) => i.concluido).length}/${ITENS_ADMISSAO.length})` : "Admissão",
-      visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={setAba} /> },
-    { valor: "pessoais", rotulo: "Dados pessoais", visivel: pode("colaborador.dados_pessoais.ler", loja), conteudo: <DadosPessoais c={c} /> },
+      visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={irPara} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
     { valor: "uniformes", rotulo: "Uniformes", visivel: pode("uniforme.ler", loja), conteudo: <UniformesColaborador c={c} /> },
     { valor: "equipamentos", rotulo: "Equipamentos", visivel: pode("equipamento.ler", loja), conteudo: <EquipamentosColaborador c={c} /> },
     { valor: "timeline", rotulo: "Linha do tempo", visivel: true, conteudo: <LinhaDoTempo c={c} /> },
   ];
+  const visiveis = abas.filter((a) => a.visivel);
 
   return (
     <>
@@ -58,25 +60,28 @@ export function Ficha() {
         {status && <Selo tom={status.tom}>{status.rotulo}</Selo>}
       </div>
 
-      <Tabs.Root value={aba} onValueChange={setAba}>
-        <Tabs.List className="mb-6 flex gap-1 overflow-x-auto border-b border-borda" aria-label="Seções da ficha">
-          {abas.filter((a) => a.visivel).map((a) => (
-            <Tabs.Trigger key={a.valor} value={a.valor}
-              className="h-10 shrink-0 border-b-2 border-transparent px-3 text-sm font-medium text-texto-suave hover:text-texto data-[state=active]:border-primaria data-[state=active]:text-primaria">
-              {a.rotulo}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        {abas.filter((a) => a.visivel).map((a) => <Tabs.Content key={a.valor} value={a.valor}>{a.conteudo}</Tabs.Content>)}
-      </Tabs.Root>
+      {/* índice fixo: leva a cada seção da página */}
+      <nav aria-label="Seções da ficha" className="sticky top-0 z-10 -mx-4 mb-6 flex gap-1 overflow-x-auto border-b border-borda bg-fundo/95 px-4 py-2 backdrop-blur sm:-mx-0 sm:px-0">
+        {visiveis.map((a) => (
+          <button key={a.valor} type="button" onClick={() => irPara(a.valor)}
+            className="h-9 shrink-0 rounded-full px-3 text-sm font-medium text-texto-suave hover:bg-superficie hover:text-texto">
+            {a.rotulo}
+          </button>
+        ))}
+      </nav>
+      <div className="flex flex-col gap-10">
+        {visiveis.map((a) => (
+          <section key={a.valor} id={`secao-${a.valor}`} aria-labelledby={`titulo-${a.valor}`} className="scroll-mt-16">
+            <h2 id={`titulo-${a.valor}`} className={a.valor === "documentos" ? "sr-only" : "mb-3 text-lg font-semibold"}>{a.rotulo}</h2>
+            {a.conteudo}
+          </section>
+        ))}
+      </div>
       <p className="mt-8 text-xs text-texto-suave">Contratos, exames, jornada, férias, ocorrências, treinamentos e avaliações chegam nas próximas etapas.</p>
     </>
   );
 }
 
-function Linha({ rotulo, children }: { rotulo: string; children: ReactNode }) {
-  return <div><dt className="text-xs text-texto-suave">{rotulo}</dt><dd className="mt-0.5 text-sm">{children}</dd></div>;
-}
 
 /* ---------------- Visão geral + ações ---------------- */
 function VisaoGeral({ c }: { c: ColaboradorLinha }) {
@@ -104,22 +109,10 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      <Cartao titulo="Vínculo atual" className="lg:col-span-2">
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <Linha rotulo="Loja">{c.loja_nome}</Linha>
-          <Linha rotulo="Cargo">{c.cargo_nome ?? "—"}</Linha>
-          <Linha rotulo="Tipo de vínculo">{c.tipo ? TIPOS_VINCULO[c.tipo] : "—"}</Linha>
-          <Linha rotulo="Matrícula">{c.matricula ?? "—"}</Linha>
-          <Linha rotulo="Admissão">{data(c.data_admissao)}</Linha>
-          <Linha rotulo="Desligamento">{data(c.data_desligamento)}</Linha>
-          <Linha rotulo="Jornada semanal">{c.jornada_semanal_horas ? `${c.jornada_semanal_horas} h` : "—"}</Linha>
-          <Linha rotulo="Escala">{c.escala ?? "—"}</Linha>
-          <Linha rotulo="CPF">{c.cpf_mascarado}</Linha>
-        </dl>
-        {pode("remuneracao.ler", loja) && <SalarioAtual vinculo={c.vinculo_id} />}
-      </Cartao>
+      <div className="lg:col-span-2"><FichaCompleta c={c} salario={pode("remuneracao.ler", loja) ? <SalarioAtual vinculo={c.vinculo_id} /> : null}
+        contatos={<ContatosEmergencia c={c} podeEditar={pode("colaborador.dados_pessoais.editar", loja)} />} /></div>
 
-      <Cartao titulo="Ações">
+      <div><Cartao titulo="Ações" className="lg:sticky lg:top-16">
         {c.status === "em_desligamento" && desligamento.data && (
           <div className="mb-4 flex flex-col gap-2">
             <Aviso tom="alerta">Desligamento em andamento ({desligamento.data.modalidade.replace(/_/g, " ")}) desde {data(desligamento.data.data_comunicacao)}.</Aviso>
@@ -132,7 +125,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
             <Botao key={k} variante="secundaria" className="justify-start" icone={<I className="size-4" />} onClick={() => setAcao(k)}>{rotulo}</Botao>
           ))}
         </div>
-      </Cartao>
+      </Cartao></div>
 
       {acao === "efetivar" && <EfetivarContrato c={c} fechar={() => setAcao(null)} />}
       {acao === "editar" && <EditarVinculo c={c} fechar={() => setAcao(null)} />}
@@ -370,114 +363,8 @@ function ConcluirDesligamento({ c, id, fechar }: { c: ColaboradorLinha; id: stri
   );
 }
 
-/* ---------------- Dados pessoais ---------------- */
-type Pessoais = { cpf: string; data_nascimento: string | null; email: string | null; telefone: string | null; cep: string | null; logradouro: string | null;
-  numero: string | null; complemento: string | null; bairro: string | null; cidade: string | null; uf: string | null };
-
-function DadosPessoais({ c }: { c: ColaboradorLinha }) {
-  const { pode } = useAuth();
-  const avisar = useAvisos();
-  const [dados, setDados] = useState<Pessoais | null>(null);
-  const [editando, setEditando] = useState(false);
-  const [carregando, setCarregando] = useState(false);
-  const podeEditar = pode("colaborador.dados_pessoais.editar", c.loja_atual_id);
-
-  async function revelar() {
-    setCarregando(true);
-    const { data, error } = await supabase.rpc("colaborador_dados_pessoais", { p_colaborador: c.id });
-    setCarregando(false);
-    if (error) return avisar("erro", mensagemErro(error));
-    if (!data) return avisar("erro", "Acesso negado aos dados pessoais.");
-    setDados(data as Pessoais);
-  }
-
-  if (!dados) {
-    return (
-      <Cartao>
-        <div className="flex flex-col items-center gap-3 py-8 text-center">
-          <EyeOff className="size-8 text-texto-suave" aria-hidden />
-          <p className="max-w-md text-sm text-texto-suave">Os dados pessoais completos ficam ocultos. Ao exibir, o acesso é registrado na auditoria com seu nome e horário.</p>
-          <Botao onClick={revelar} carregando={carregando} icone={<Eye className="size-4" />}>Exibir dados pessoais</Botao>
-        </div>
-      </Cartao>
-    );
-  }
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Cartao titulo="Dados pessoais" acao={podeEditar && <Botao tamanho="sm" variante="secundaria" icone={<Pencil className="size-4" />} onClick={() => setEditando(true)}>Editar</Botao>}>
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <Linha rotulo="CPF">{mascaraCpf(dados.cpf)}</Linha>
-          <Linha rotulo="Nascimento">{data(dados.data_nascimento)}</Linha>
-          <Linha rotulo="Celular">{dados.telefone ? mascaraTelefone(dados.telefone) : "—"}</Linha>
-          <Linha rotulo="E-mail">{dados.email ?? "—"}</Linha>
-          <Linha rotulo="Endereço">
-            {dados.logradouro ? `${dados.logradouro}, ${dados.numero ?? "s/n"}${dados.complemento ? ` — ${dados.complemento}` : ""}` : "—"}
-            {dados.bairro && <><br />{dados.bairro} · {dados.cidade}/{dados.uf}</>}
-          </Linha>
-          <Linha rotulo="CEP">{dados.cep ?? "—"}</Linha>
-        </dl>
-      </Cartao>
-      <ContatosEmergencia c={c} podeEditar={podeEditar} />
-      {editando && <EditarPessoais c={c} dados={dados} fechar={(novo) => { setEditando(false); if (novo) setDados(novo); }} />}
-    </div>
-  );
-}
-
-function EditarPessoais({ c, dados, fechar }: { c: ColaboradorLinha; dados: Pessoais; fechar: (novo?: Pessoais) => void }) {
-  const avisar = useAvisos();
-  const qc = useQueryClient();
-  const [f, setF] = useState({ ...dados, nome_completo: c.nome_completo, nome_social: c.nome_social ?? "" } as Record<string, string | null>);
-  const [buscandoCep, setBuscandoCep] = useState(false);
-  const set = (k: string) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
-
-  async function buscarCep() {
-    const cep = so_digitos(f.cep ?? "");
-    if (cep.length !== 8) return;
-    setBuscandoCep(true);
-    try {
-      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then((x) => x.json());
-      if (!r.erro) setF((s) => ({ ...s, logradouro: r.logradouro, bairro: r.bairro, cidade: r.localidade, uf: r.uf }));
-    } catch { /* preenchimento manual */ }
-    setBuscandoCep(false);
-  }
-
-  const m = useMutation({
-    mutationFn: async () => {
-      const p = { ...f, cpf: so_digitos(f.cpf ?? ""), telefone: so_digitos(f.telefone ?? ""), cep: so_digitos(f.cep ?? "") };
-      const { error } = await supabase.rpc("atualizar_dados_pessoais", { p_colaborador: c.id, p });
-      if (error) throw error;
-      return p;
-    },
-    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ["colaborador"] }); avisar("sucesso", "Dados atualizados."); fechar(p as unknown as Pessoais); },
-    onError: (e) => avisar("erro", mensagemErro(e)),
-  });
-
-  return (
-    <Modal aberto aoFechar={() => fechar()} titulo="Editar dados pessoais" largura="max-w-2xl">
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="grid gap-4 sm:grid-cols-2">
-        <Campo rotulo="Nome completo" value={f.nome_completo ?? ""} onChange={set("nome_completo")} obrigatorio className="sm:col-span-2" />
-        <Campo rotulo="Nome social" value={f.nome_social ?? ""} onChange={set("nome_social")} />
-        <Campo rotulo="CPF" value={mascaraCpf(f.cpf ?? "")} onChange={set("cpf")} obrigatorio />
-        <Campo rotulo="Nascimento" type="date" value={f.data_nascimento ?? ""} onChange={set("data_nascimento")} max={hoje()} />
-        <Campo rotulo="Celular" value={mascaraTelefone(f.telefone ?? "")} onChange={set("telefone")} />
-        <Campo rotulo="E-mail" type="email" value={f.email ?? ""} onChange={set("email")} className="sm:col-span-2 [&_input]:uppercase" />
-        <Campo rotulo="CEP" value={f.cep ?? ""} onChange={set("cep")} onBlur={buscarCep} dica={buscandoCep ? "Buscando endereço…" : "Preenche o endereço automaticamente"} />
-        <Campo rotulo="Logradouro" value={f.logradouro ?? ""} onChange={set("logradouro")} />
-        <Campo rotulo="Número" value={f.numero ?? ""} onChange={set("numero")} />
-        <Campo rotulo="Complemento" value={f.complemento ?? ""} onChange={set("complemento")} />
-        <Campo rotulo="Bairro" value={f.bairro ?? ""} onChange={set("bairro")} />
-        <div className="grid grid-cols-3 gap-4">
-          <Campo rotulo="Cidade" value={f.cidade ?? ""} onChange={set("cidade")} className="col-span-2" />
-          <Campo rotulo="UF" maxLength={2} value={f.uf ?? ""} onChange={set("uf")} />
-        </div>
-        <div className="sm:col-span-2"><Rodape fechar={() => fechar()} carregando={m.isPending} /></div>
-      </form>
-    </Modal>
-  );
-}
-
-function ContatosEmergencia({ c, podeEditar }: { c: ColaboradorLinha; podeEditar: boolean }) {
+/* ---------------- Contato de emergência ---------------- */
+export function ContatosEmergencia({ c, podeEditar }: { c: ColaboradorLinha; podeEditar: boolean }) {
   const qc = useQueryClient();
   const avisar = useAvisos();
   const [novo, setNovo] = useState<{ nome: string; parentesco: string; telefone: string } | null>(null);
@@ -495,7 +382,7 @@ function ContatosEmergencia({ c, podeEditar }: { c: ColaboradorLinha; podeEditar
     onError: (e) => avisar("erro", mensagemErro(e)),
   });
   return (
-    <Cartao titulo="Contato de emergência" acao={podeEditar && !novo && <Botao tamanho="sm" variante="secundaria" onClick={() => setNovo({ nome: "", parentesco: "", telefone: "" })}>Adicionar</Botao>}>
+    <Cartao titulo="Contatos de emergência" acao={podeEditar && !novo && <Botao tamanho="sm" variante="secundaria" onClick={() => setNovo({ nome: "", parentesco: "", telefone: "" })}>Adicionar</Botao>}>
       {q.isLoading ? <Carregando /> : q.data?.length === 0 && !novo ? <p className="text-sm text-texto-suave">Nenhum contato cadastrado.</p> : (
         <ul className="flex flex-col gap-3">
           {q.data?.map((k) => <li key={k.id} className="text-sm"><span className="font-medium">{k.nome}</span>{k.parentesco && ` (${k.parentesco})`} · {mascaraTelefone(k.telefone)}</li>)}

@@ -77,7 +77,8 @@ REGRAS:
 ${lojas.map((l) => `- ${l.codigo}: ${l.nome}${l.cidade ? ` (${l.cidade})` : ""}`).join("\n")}
 - cargo_nome: copie o cargo/função como está escrito na ficha.
 - tipo_vinculo: "clt_experiencia" se a ficha indicar contrato de experiência; "clt_prazo_indeterminado" se CLT sem experiência; outro tipo só se estiver explícito; vazio se não houver indicação.
-- Não inclua informações de saúde em nenhum campo.
+- Não inclua diagnóstico ou detalhe de saúde; em "deficiencia" copie só o que está escrito no campo (ex.: Não).
+- Se a ficha for um "Registro de Empregado": "Horário de Trabalho" vai em escala, "Horário de Intervalo" em horario_intervalo, "Opção FGTS" em fgts_opcao, "Beneficiários" em dependentes.
 Hoje é ${hoje}.`;
 
   const ferramenta = {
@@ -95,7 +96,18 @@ Hoje é ${hoje}.`;
         tipo_vinculo: { type: "string", enum: [...TIPOS, ""] },
         data_admissao: { type: "string" }, jornada_semanal_horas: { type: "number" }, escala: { type: "string" },
         salario_base: { type: "number" },
-        outros_dados: { type: "string", description: "Lista curta de outros dados presentes na ficha que não têm campo (ex.: RG, PIS, CTPS, dependentes, banco), só os NOMES dos campos, sem os valores" },
+        local_nascimento: { type: "string", description: "Cidade - UF de nascimento" }, nacionalidade: { type: "string" },
+        estado_civil: { type: "string" }, sexo: { type: "string" }, cor_raca: { type: "string" }, grau_instrucao: { type: "string" },
+        deficiencia: { type: "string", description: "Como escrito na ficha (ex.: Não)" }, nome_pai: { type: "string" }, nome_mae: { type: "string" },
+        rg: { type: "string" }, rg_emissao: { type: "string" }, rg_orgao: { type: "string", description: "Órgão/UF emissor" },
+        ctps: { type: "string" }, ctps_serie: { type: "string" }, ctps_emissao: { type: "string" }, ctps_uf: { type: "string" },
+        pis: { type: "string" }, pis_cadastro: { type: "string" }, titulo_eleitor: { type: "string" }, titulo_zona: { type: "string" },
+        titulo_secao: { type: "string" }, cnh: { type: "string" }, cnh_categoria: { type: "string" }, doc_militar: { type: "string" },
+        orgao_classe: { type: "string" }, telefone_residencial: { type: "string" }, banco: { type: "string" }, agencia: { type: "string" },
+        conta: { type: "string" }, funcao: { type: "string" }, cbo: { type: "string" }, horario_intervalo: { type: "string" },
+        fgts_opcao: { type: "string" }, departamento: { type: "string" }, centro_custo: { type: "string" },
+        dependentes: { type: "array", description: "Dependentes/beneficiários listados na ficha", items: { type: "object",
+          properties: { nome: { type: "string" }, parentesco: { type: "string" }, data_nascimento: { type: "string" } }, required: ["nome"] } },
         legibilidade: { type: "string", enum: ["boa", "parcial", "ruim"] },
       },
       required: ["legibilidade"],
@@ -157,6 +169,27 @@ Hoje é ${hoje}.`;
     escala: texto(u.escala, 60), salario_base: salario ? salario.toFixed(2) : null,
   };
 
+  // ---- campos extras (gravados depois do cadastro, por bloco) ----
+  const t = (v: unknown, max = 120) => typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined;
+  const d = (v: unknown) => dataISO(v) ?? undefined;
+  const limpa = (o: Record<string, string | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v)) as Record<string, string>;
+  const extras = {
+    contrato: limpa({ funcao: t(u.funcao), cbo: t(u.cbo, 20), horario_intervalo: t(u.horario_intervalo, 80), fgts_opcao: d(u.fgts_opcao),
+                      departamento_texto: t(u.departamento, 80), centro_custo: t(u.centro_custo, 80) }),
+    pessoais: limpa({ local_nascimento: t(u.local_nascimento, 80), nacionalidade: t(u.nacionalidade, 40), estado_civil: t(u.estado_civil, 30),
+                      sexo: t(u.sexo, 20), cor_raca: t(u.cor_raca, 30), grau_instrucao: t(u.grau_instrucao, 60), deficiencia: t(u.deficiencia, 60),
+                      nome_pai: t(u.nome_pai, 150), nome_mae: t(u.nome_mae, 150) }),
+    documentos: limpa({ rg: t(u.rg, 30), rg_emissao: d(u.rg_emissao), rg_orgao: t(u.rg_orgao, 20), ctps: t(u.ctps, 20), ctps_serie: t(u.ctps_serie, 10),
+                      ctps_emissao: d(u.ctps_emissao), ctps_uf: t(u.ctps_uf, 2), pis: t(u.pis, 20), pis_cadastro: d(u.pis_cadastro),
+                      titulo_eleitor: t(u.titulo_eleitor, 20), titulo_zona: t(u.titulo_zona, 10), titulo_secao: t(u.titulo_secao, 10),
+                      cnh: t(u.cnh, 20), cnh_categoria: t(u.cnh_categoria, 5), doc_militar: t(u.doc_militar, 30), orgao_classe: t(u.orgao_classe, 30) }),
+    contato: limpa({ telefone_residencial: (() => { const x = digitos(u.telefone_residencial); return x.length === 10 || x.length === 11 ? x : undefined; })() }),
+    banco: limpa({ banco: t(u.banco, 60), agencia: t(u.agencia, 20), conta: t(u.conta, 30) }),
+    dependentes: (Array.isArray(u.dependentes) ? u.dependentes : []).slice(0, 20)
+      .map((x: Record<string, unknown>) => ({ nome: t(x?.nome, 150), parentesco: t(x?.parentesco, 40) ?? null, data_nascimento: d(x?.data_nascimento) ?? null }))
+      .filter((x: { nome?: string }) => x.nome),
+  };
+
   let ja_cadastrado: { id: string; nome_completo: string } | null = null;
   if (cpf) {
     const { data } = await usuario.rpc("localizar_colaborador_por_cpf", { p_cpf: cpf });
@@ -172,7 +205,7 @@ Hoje é ${hoje}.`;
     dados,
     cargo_lido: cargoLido && !cargo ? cargoLido : null,
     cpf_lido_invalido: !cpf && digitos(u.cpf).length > 0,
-    outros_dados: typeof u.outros_dados === "string" ? u.outros_dados.slice(0, 300) : null,
+    extras,
     legibilidade: ["boa", "parcial", "ruim"].includes(String(u.legibilidade)) ? u.legibilidade : "parcial",
     ja_cadastrado,
   });

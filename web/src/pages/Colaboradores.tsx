@@ -91,7 +91,8 @@ export function Colaboradores() {
 /* ---------------- Leitura da ficha de admissão ---------------- */
 type LeituraFicha = {
   dados: Record<string, string | null>; cargo_lido: string | null; cpf_lido_invalido: boolean;
-  outros_dados: string | null; legibilidade: "boa" | "parcial" | "ruim"; ja_cadastrado: { id: string; nome_completo: string } | null;
+  extras: Record<"contrato" | "pessoais" | "documentos" | "contato" | "banco", Record<string, string>> & { dependentes: { nome: string; parentesco: string | null; data_nascimento: string | null }[] };
+  legibilidade: "boa" | "parcial" | "ruim"; ja_cadastrado: { id: string; nome_completo: string } | null;
 };
 
 function FichaAdmissao({ aoLer, lendo, setLendo }: { aoLer: (r: LeituraFicha, arquivo: File) => void; lendo: boolean; setLendo: (v: boolean) => void }) {
@@ -145,6 +146,8 @@ export function NovoColaborador() {
   const [anexar, setAnexar] = useState(true);
   const [lendo, setLendo] = useState(false);
   const categorias = useCategorias();
+  const qtdExtras = leitura?.extras ? (["contrato", "pessoais", "documentos", "contato", "banco"] as const)
+    .reduce((n, b) => n + Object.keys(leitura.extras[b] ?? {}).length, 0) + (leitura.extras.dependentes?.length ?? 0) : 0;
   const marca = (k: string, dica?: string) => lidos.has(k) ? "✓ Lido da ficha — confira" : dica;
   function aplicarLeitura(r: LeituraFicha, arquivo: File) {
     const novos = new Set<string>();
@@ -183,6 +186,23 @@ export function NovoColaborador() {
           anexou = true;
         } catch { anexou = false; }
       }
+      // demais campos da ficha (RG, CTPS, PIS, filiação, dependentes, banco…)
+      let extrasFalhou = false;
+      if (leitura?.extras) {
+        const blocos = ["contrato", "pessoais", "documentos", "contato", "banco"] as const;
+        for (const b of blocos) {
+          const p = leitura.extras[b];
+          if (p && Object.keys(p).length) {
+            const { error: e2 } = await supabase.rpc("colaborador_ficha_salvar", { p_colaborador: id, p_bloco: b, p });
+            if (e2) extrasFalhou = true;
+          }
+        }
+        if (leitura.extras.dependentes?.length) {
+          const { error: e3 } = await supabase.rpc("colaborador_ficha_salvar", { p_colaborador: id, p_bloco: "dependentes", p: { dependentes: leitura.extras.dependentes } });
+          if (e3) extrasFalhou = true;
+        }
+      }
+      if (extrasFalhou) avisar("erro", "Alguns dados extras da ficha não foram gravados. Complete na Visão geral do colaborador.");
       return { id, anexou };
     },
     onSuccess: ({ id, anexou }) => {
@@ -229,7 +249,7 @@ export function NovoColaborador() {
               {leitura.cpf_lido_invalido && " O CPF da ficha não é válido — digite-o conferindo o documento."}
               {leitura.cargo_lido && ` Cargo escrito na ficha: "${leitura.cargo_lido}" — escolha o correspondente na lista.`}
               {!f.matricula && " Informe a matrícula."}
-              {leitura.outros_dados && ` Outros dados na ficha (ficam no arquivo anexado): ${leitura.outros_dados}.`}
+              {qtdExtras > 0 && ` Também serão gravados mais ${qtdExtras} dados da ficha (documentos, filiação, dependentes, banco etc.) — confira depois na Visão geral do colaborador.`}
             </Aviso>
           </div>
         )}
