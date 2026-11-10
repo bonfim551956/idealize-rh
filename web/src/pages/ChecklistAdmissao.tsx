@@ -19,7 +19,7 @@ const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; 
   uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Conclui sozinho quando a entrega é lançada na aba Uniformes." },
   cracha:          { rotulo: "Entrega de crachá", icone: IdCard, como: "Registre a data da entrega (ou lance o crachá na aba Equipamentos)." },
   termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Imprima o termo padrão, colha a assinatura e anexe o termo assinado." },
-  equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Conclui sozinho quando a entrega é lançada na aba Equipamentos." },
+  equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
 };
 export const ITENS_ADMISSAO = ["cartao_vr", "uniforme", "cracha", "termo_imagem", "equipamento_epi"] as const;
 
@@ -60,7 +60,10 @@ ol{padding-left:20px}li{margin-bottom:6px}.ass{margin-top:64px;display:flex;just
   w.document.close();
 }
 
-function RegistrarEntrega({ c, item, fechar }: { c: ColaboradorLinha; item: "cartao_vr" | "cracha"; fechar: () => void }) {
+const TITULO_REGISTRO = { cartao_vr: "Entrega do cartão VR", cracha: "Entrega de crachá", epi_nao_tem: "Não tem EPI / equipamento para entregar" };
+
+function RegistrarEntrega({ c, item, fechar }: { c: ColaboradorLinha; item: "cartao_vr" | "cracha" | "epi_nao_tem"; fechar: () => void }) {
+  const semEpi = item === "epi_nao_tem";
   const qc = useQueryClient(); const avisar = useAvisos();
   const [dt, setDt] = useState(hoje()); const [obs, setObs] = useState("");
   const m = useMutation({
@@ -68,14 +71,15 @@ function RegistrarEntrega({ c, item, fechar }: { c: ColaboradorLinha; item: "car
       const { error } = await supabase.rpc("admissao_registrar_item", { p_colaborador: c.id, p_item: item, p_data: dt, p_observacao: obs || null });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admissao-checklist"] }); qc.invalidateQueries({ queryKey: ["painel-pendencias"] }); avisar("sucesso", "Entrega registrada."); fechar(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admissao-checklist"] }); qc.invalidateQueries({ queryKey: ["painel-pendencias"] }); avisar("sucesso", semEpi ? "Registrado: não tem EPI para entregar." : "Entrega registrada."); fechar(); },
     onError: (e) => avisar("erro", mensagemErro(e)),
   });
   return (
-    <Modal aberto aoFechar={fechar} titulo={ITENS[item].rotulo} descricao={c.nome_completo}>
+    <Modal aberto aoFechar={fechar} titulo={TITULO_REGISTRO[item]} descricao={c.nome_completo}>
       <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="flex flex-col gap-4">
-        <Campo rotulo="Data da entrega" type="date" obrigatorio value={dt} onChange={(e) => setDt(e.target.value)} max={hoje()} />
-        <AreaTexto rotulo="Observação" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Opcional" />
+        {semEpi && <p className="text-sm text-texto-suave">Use quando a função desta pessoa não usa EPI nem equipamento. Se depois houver entrega, é só lançar na aba Equipamentos.</p>}
+        <Campo rotulo={semEpi ? "Data" : "Data da entrega"} type="date" obrigatorio value={dt} onChange={(e) => setDt(e.target.value)} max={hoje()} />
+        <AreaTexto rotulo="Observação" rows={2} value={obs} onChange={(e) => setObs(e.target.value)} placeholder={semEpi ? "Opcional. Ex.: função de vendas não usa EPI" : "Opcional"} />
         <div className="flex justify-end gap-2">
           <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
           <Botao type="submit" carregando={m.isPending} disabled={!dt}>Salvar</Botao>
@@ -110,7 +114,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
   const { pode } = useAuth();
   const qc = useQueryClient(); const avisar = useAvisos();
   const categorias = useCategorias();
-  const [registrando, setRegistrando] = useState<"cartao_vr" | "cracha" | null>(null);
+  const [registrando, setRegistrando] = useState<"cartao_vr" | "cracha" | "epi_nao_tem" | null>(null);
   const [desfazendo, setDesfazendo] = useState<ItemChecklist | null>(null);
   const [enviando, setEnviando] = useState(false);
   const q = useChecklistAdmissao(c.id);
@@ -164,8 +168,11 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                 {!it?.concluido && k === "uniforme" && pode("uniforme.ler", loja) && (
                   <Botao tamanho="sm" onClick={() => irPara("uniformes")}>Entregar uniforme</Botao>
                 )}
-                {!it?.concluido && k === "equipamento_epi" && pode("equipamento.ler", loja) && (
-                  <Botao tamanho="sm" onClick={() => irPara("equipamentos")}>Registrar entrega</Botao>
+                {!it?.concluido && k === "equipamento_epi" && (
+                  <>
+                    {podeEntregar && <Botao tamanho="sm" variante="secundaria" onClick={() => setRegistrando("epi_nao_tem")}>Não tem</Botao>}
+                    {pode("equipamento.ler", loja) && <Botao tamanho="sm" onClick={() => irPara("equipamentos")}>Tem: registrar entrega</Botao>}
+                  </>
                 )}
                 {!it?.concluido && k === "termo_imagem" && (
                   <>
@@ -189,7 +196,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
       </ul>
       <p className="mt-4 text-xs text-texto-suave">Obrigatórios em toda admissão. Enquanto faltar algum item, a pessoa aparece nas Pendências do Painel.</p>
       {registrando && <RegistrarEntrega c={c} item={registrando} fechar={() => setRegistrando(null)} />}
-      {desfazendo?.registro_id && <Desfazer id={desfazendo.registro_id} rotulo={ITENS[desfazendo.item].rotulo} fechar={() => setDesfazendo(null)} />}
+      {desfazendo?.registro_id && <Desfazer id={desfazendo.registro_id} rotulo={desfazendo.item === "equipamento_epi" ? "Não tem EPI / equipamento para entregar" : ITENS[desfazendo.item].rotulo} fechar={() => setDesfazendo(null)} />}
     </Cartao>
   );
 }
