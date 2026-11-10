@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "0 12 * * *"   # 12:00 UTC = 09:00 em Brasília
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["robos/banco-horas/**", ".github/workflows/banco-horas.yml"]
 
 permissions:
   contents: read
