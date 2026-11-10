@@ -13,6 +13,7 @@ import { Manual } from "./pages/Manual";
 import { Uniformes } from "./pages/Uniformes";
 import { ValeTransporte } from "./pages/ValeTransporte";
 import { Ferias } from "./pages/Ferias";
+import { BancoHoras } from "./pages/BancoHoras";
 
 /** Exige login (e MFA quando o perfil pede). */
 function Protegida({ children }: { children: ReactNode }) {
@@ -53,6 +54,7 @@ export function App() {
         <Route path="documentos" element={<Requer perm={leDocs}><PaginaDocumentos /></Requer>} />
         <Route path="uniformes" element={<Requer perm="uniforme.ler"><Uniformes /></Requer>} />
         <Route path="ferias" element={<Requer perm="colaborador.ler"><Ferias /></Requer>} />
+        <Route path="banco-horas" element={<Requer perm="colaborador.ler"><BancoHoras /></Requer>} />
         <Route path="vale-transporte" element={<Requer perm={(p) => p("vt.ler") || p("ausencia.ler")}><ValeTransporte /></Requer>} />
         <Route path="lojas" element={<Requer perm="config.estrutura.gerir"><Lojas /></Requer>} />
         <Route path="acessos" element={<Requer perm="acesso.gerir"><Acessos /></Requer>} />

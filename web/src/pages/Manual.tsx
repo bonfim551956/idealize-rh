@@ -591,6 +591,26 @@ const SECOES: Secao[] = [
       </>
     ),
   },
+  /* ---------------- Banco de horas ---------------- */
+  {
+    id: "banco-horas", titulo: "Banco de horas (VR)", icone: Palmtree, grupo: "VT e ausências",
+    palavras: "banco de horas saldo horas extras negativas positivas vr pontomais rh digital ponto registro faltando batida pendência subindo robô",
+    mostrar: (c) => c.pode("colaborador.ler"),
+    conteudo: () => (
+      <>
+        <P>Todo dia às 9h um robô entra no RH Digital da VR (Pontomais), lê o relatório de banco de horas e o de pendências de ponto dos últimos 35 dias e traz tudo para <Menu>Banco de horas</Menu>. Os lançamentos e ajustes continuam sendo feitos no VR.</P>
+        <Quadro cabecalho={["Na tela", "O que mostra"]} linhas={[
+          ["Saldo atual", "Saldo do banco no último dia lido. Vermelho = negativo (forte a partir de −20h); laranja = acima de +40h."],
+          ["Últimos 7 dias", "Quanto o saldo mudou na última semana. Com +2h ou mais aparece como “subindo” e entra nas Pendências do Painel."],
+          ["Registros", "Batidas faltando (número errado de pontos) ou faltas sem justificativa nos últimos 7 dias. Também entram nas Pendências."],
+          ["Registros de ponto em aberto", "Lista dos últimos 35 dias, com ajustes e abonos ainda esperando aprovação no VR."],
+        ]} />
+        <P>Clique no nome do colaborador para ver o <B>relatório dia a dia</B>: gráfico do saldo, horas positivas e negativas de cada dia e as pendências de ponto.</P>
+        <P>Se um nome do VR não bater com o cadastro, ele aparece em <B>Nomes do VR sem colaborador</B>; clique em <Menu>Vincular</Menu> e escolha a pessoa certa.</P>
+        <Dica>Se o robô falhar (senha da VR trocada, código que não chegou no Gmail), aparece o aviso “Banco de horas do VR sem atualizar” no Painel.</Dica>
+      </>
+    ),
+  },
   /* ---------------- VT e ausências ---------------- */
   {
     id: "vale-transporte", titulo: "Vale-transporte e ausências", icone: Bus, grupo: "VT e ausências",
