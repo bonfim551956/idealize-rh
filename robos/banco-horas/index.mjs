@@ -16,7 +16,8 @@ class Erro extends Error {}
 const DIAS = Number(process.env.DIAS ?? 35);
 const PORTAL = "https://superportal-empregador.vr.com.br";
 const API = "https://api.pontomais.com.br";
-const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+let etapa = "início";
+const log = (...a) => { etapa = a.join(" "); console.log(new Date().toISOString().slice(11, 19), ...a); };
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const iso = (d) => d.toISOString().slice(0, 10);
 
@@ -60,15 +61,19 @@ async function entrar(page) {
     const titulo = await page.title().catch(() => "");
     throw new Erro(`A página de login da VR não abriu (${titulo || "sem título"}) — possível bloqueio de robô`);
   });
-  await usuario.fill(env("VR_USUARIO"));
+  log("página de login aberta");
+  await usuario.click();
+  await usuario.pressSequentially(env("VR_USUARIO"), { delay: 40 });
   const senha = page.locator('input[name="password"]');
   if (!(await senha.isVisible().catch(() => false))) {
-    await page.locator('button[type="submit"]').first().click();
+    log("senha em outra etapa; avançando");
+    await usuario.press("Enter");
     await senha.waitFor({ timeout: 30_000 });
   }
-  await senha.fill(env("VR_SENHA"));
+  await senha.click();
+  await senha.pressSequentially(env("VR_SENHA"), { delay: 40 });
   const antes = new Date();
-  await page.locator('button[type="submit"][name="action"], button[type="submit"]').first().click();
+  await senha.press("Enter");
   log("usuário e senha enviados");
 
   // ou cai direto no portal, ou pede o código
@@ -84,10 +89,12 @@ async function entrar(page) {
   if (resultado === "codigo") {
     log("VR pediu código; lendo o Gmail");
     const codigo = await codigoDoGmail(antes);
-    await campoCodigo.fill(codigo);
+    log("código encontrado no Gmail");
+    await campoCodigo.click();
+    await campoCodigo.pressSequentially(codigo, { delay: 60 });
     const lembrar = page.locator('input[type="checkbox"][name*="remember" i]');
     if (await lembrar.isVisible().catch(() => false)) await lembrar.check().catch(() => {});
-    await page.locator('button[type="submit"][name="action"], button[type="submit"]').first().click();
+    await campoCodigo.press("Enter");
     await page.waitForURL(/superportal-empregador\.vr\.com\.br/, { timeout: 90_000 })
       .catch(() => { throw new Erro("O código foi digitado, mas o portal não abriu"); });
   }
@@ -258,7 +265,7 @@ async function principal() {
     const r = await enviar({ status: "ok", ...periodo }, linhas, pendencias);
     log(`enviado ao RH 360: ${r.linhas} linhas, ${r.pessoas} pessoas`);
   } catch (e) {
-    const msg = e instanceof Erro ? e.message : `Erro inesperado: ${String(e?.message || e).split("\n")[0].slice(0, 200)}`;
+    const msg = e instanceof Erro ? e.message : `Erro inesperado depois de "${etapa}": ${String(e?.message || e).split("\n")[0].slice(0, 200)}`;
     log(`FALHOU: ${msg}`);
     await enviar({ status: "erro", mensagem: msg, ...periodo }, []).catch(() => log("também não consegui avisar o RH 360"));
     process.exitCode = 1;
