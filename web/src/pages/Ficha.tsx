@@ -93,8 +93,9 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
   const desligamento = useQuery({
     queryKey: ["desligamento", c.vinculo_id],
     enabled: c.status === "em_desligamento" && pode("desligamento.gerir", loja),
-    queryFn: async () => falhar(await supabase.from("desligamentos").select("id,modalidade,data_comunicacao,status").eq("vinculo_id", c.vinculo_id!).eq("status", "em_andamento").maybeSingle()) as
-      { id: string; modalidade: string; data_comunicacao: string; status: string } | null,
+    queryFn: async () => falhar(await supabase.from("desligamentos").select("id,modalidade,data_comunicacao,status,aviso_tipo,aviso_reducao,aviso_dias,fim_aviso,ultimo_dia").eq("vinculo_id", c.vinculo_id!).eq("status", "em_andamento").maybeSingle()) as
+      { id: string; modalidade: string; data_comunicacao: string; status: string; aviso_tipo: string | null; aviso_reducao: string | null;
+        aviso_dias: number | null; fim_aviso: string | null; ultimo_dia: string | null } | null,
   });
 
   const botoes = [
@@ -115,7 +116,17 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
       <div><Cartao titulo="Ações" className="lg:sticky lg:top-16">
         {c.status === "em_desligamento" && desligamento.data && (
           <div className="mb-4 flex flex-col gap-2">
-            <Aviso tom="alerta">Desligamento em andamento ({desligamento.data.modalidade.replace(/_/g, " ")}) desde {data(desligamento.data.data_comunicacao)}.</Aviso>
+            <Aviso tom="alerta">
+              Desligamento em andamento ({desligamento.data.modalidade.replace(/_/g, " ")}) desde {data(desligamento.data.data_comunicacao)}.
+              {desligamento.data.aviso_tipo && (
+                <span className="mt-1 block">
+                  {AVISO_ROTULO[desligamento.data.aviso_tipo] ?? desligamento.data.aviso_tipo}
+                  {desligamento.data.aviso_reducao && ` · ${desligamento.data.aviso_reducao === "7_dias" ? "sai 7 dias antes" : "sai 2h mais cedo por dia"}`}
+                  {desligamento.data.fim_aviso && ` · aviso até ${data(desligamento.data.fim_aviso)}`}
+                  {desligamento.data.ultimo_dia && <> · <strong>último dia: {data(desligamento.data.ultimo_dia)}</strong></>}
+                </span>
+              )}
+            </Aviso>
             <Botao variante="perigo" onClick={() => setAcao("concluir")}>Concluir desligamento</Botao>
           </div>
         )}
@@ -134,7 +145,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
       {acao === "cargo" && <MudarCargo c={c} fechar={() => setAcao(null)} />}
       {acao === "salario" && <MudarSalario c={c} fechar={() => setAcao(null)} />}
       {acao === "desligar" && <IniciarDesligamento c={c} fechar={() => setAcao(null)} />}
-      {acao === "concluir" && desligamento.data && <ConcluirDesligamento c={c} id={desligamento.data.id} fechar={() => setAcao(null)} />}
+      {acao === "concluir" && desligamento.data && <ConcluirDesligamento c={c} id={desligamento.data.id} ultimoDia={desligamento.data.ultimo_dia} fechar={() => setAcao(null)} />}
     </div>
   );
 }
@@ -324,28 +335,88 @@ const MODALIDADES = [
   ["termino_prazo_determinado", "Término de contrato por prazo determinado"], ["outra", "Outra"],
 ] as const;
 
+type AvisoTipo = "trabalhado" | "indenizado" | "dispensado" | "nao_cumpre";
+const somaDiasISO = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+/* aviso prévio: 30 dias + 3 por ano completo de casa (Lei 12.506/2011), até 90 — só quando a empresa dispensa */
+function diasAviso(admissao: string | null, comunicacao: string, modalidade: string) {
+  if (modalidade !== "sem_justa_causa" || !admissao) return 30;
+  const a = new Date(`${admissao}T12:00:00`), c = new Date(`${comunicacao}T12:00:00`);
+  let anos = c.getFullYear() - a.getFullYear();
+  if (c.getMonth() < a.getMonth() || (c.getMonth() === a.getMonth() && c.getDate() < a.getDate())) anos--;
+  return Math.min(90, 30 + 3 * Math.max(0, anos));
+}
+
 function IniciarDesligamento({ c, fechar }: { c: ColaboradorLinha; fechar: () => void }) {
-  const [f, setF] = useState({ modalidade: "", data: hoje(), obs: "" });
+  const [f, setF] = useState({ modalidade: "", data: hoje(), obs: "", aviso: "" as AvisoTipo | "", reducao: "" as "" | "2h_dia" | "7_dias", ultimo: "" });
+  const comAviso = ["pedido_demissao", "sem_justa_causa", "acordo"].includes(f.modalidade);
+  const opcoes: [AvisoTipo, string, string][] = f.modalidade === "pedido_demissao"
+    ? [["trabalhado", "Vai cumprir o aviso", "Trabalha os 30 dias do aviso"],
+       ["dispensado", "Empresa dispensa o cumprimento", "Sai na data combinada, sem desconto"],
+       ["nao_cumpre", "Não vai cumprir", "Sai antes; o aviso pode ser descontado na rescisão"]]
+    : [["trabalhado", "Aviso trabalhado", "Trabalha durante o aviso, com redução de jornada"],
+       ["indenizado", "Aviso indenizado", "Sai na hora; o aviso é pago na rescisão"]];
+  const dias = diasAviso(c.data_admissao, f.data, f.modalidade) / (f.modalidade === "acordo" ? 2 : 1);
+  const fimAviso = somaDiasISO(f.data, Math.ceil(dias) - 1);
+  const sugerido = f.aviso === "trabalhado" ? (f.reducao === "7_dias" ? somaDiasISO(fimAviso, -7) : fimAviso) : f.data;
+  const ultimo = f.ultimo || sugerido;
+  const precisaReducao = f.aviso === "trabalhado" && f.modalidade !== "pedido_demissao";
+  const valido = !!f.modalidade && (!comAviso || (!!f.aviso && (!precisaReducao || !!f.reducao)));
   const m = useMutation(useAcao(c, fechar, "Desligamento iniciado.")(() =>
-    supabase.rpc("iniciar_desligamento", { p_vinculo: c.vinculo_id, p_modalidade: f.modalidade, p_data_comunicacao: f.data, p_observacoes: f.obs || null })));
+    supabase.rpc("iniciar_desligamento", { p_vinculo: c.vinculo_id, p_modalidade: f.modalidade, p_data_comunicacao: f.data, p_observacoes: f.obs || null,
+      p_aviso: comAviso ? { tipo: f.aviso, reducao: precisaReducao ? f.reducao : null, dias: Math.ceil(dias), fim_aviso: fimAviso, ultimo_dia: ultimo } : null })));
+  const radio = (nome: string, valor: string, atual: string, onSel: () => void, titulo: string, desc: string) => (
+    <label key={valor} className={cx("flex cursor-pointer gap-3 rounded-lg border p-3", atual === valor ? "border-primaria bg-primaria-suave" : "border-borda")}>
+      <input type="radio" name={nome} checked={atual === valor} onChange={onSel} className="mt-1 accent-[var(--color-primaria)]" />
+      <span><span className="block text-sm font-medium">{titulo}</span><span className="text-xs text-texto-suave">{desc}</span></span>
+    </label>
+  );
   return (
-    <Modal aberto aoFechar={fechar} titulo="Iniciar desligamento" descricao={c.nome_completo}>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="flex flex-col gap-4">
-        <Aviso tom="alerta">O checklist completo (documentos rescisórios, exame demissional, devolução de equipamentos e revogação de acessos) chega na Etapa 2. Confirme as providências com a contabilidade.</Aviso>
-        <Selecao rotulo="Modalidade" value={f.modalidade} onChange={(e) => setF({ ...f, modalidade: e.target.value })} obrigatorio>
+    <Modal aberto aoFechar={fechar} titulo="Iniciar desligamento" descricao={c.nome_completo} largura="max-w-xl">
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); if (valido) m.mutate(); }} className="flex flex-col gap-4">
+        <Selecao rotulo="Modalidade" value={f.modalidade} onChange={(e) => setF({ ...f, modalidade: e.target.value, aviso: "", reducao: "", ultimo: "" })} obrigatorio>
           <option value="">Selecione</option>
           {MODALIDADES.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Selecao>
-        <Campo rotulo="Data da comunicação" type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value })} obrigatorio />
+        <Campo rotulo="Data da comunicação" type="date" value={f.data} onChange={(e) => setF({ ...f, data: e.target.value, ultimo: "" })} obrigatorio />
+        {comAviso && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium">Aviso prévio <span className="text-perigo">*</span></legend>
+            {opcoes.map(([v, t, d]) => radio("aviso", v, f.aviso, () => setF({ ...f, aviso: v, reducao: "", ultimo: "" }), t, d))}
+          </fieldset>
+        )}
+        {precisaReducao && (
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-medium">Redução durante o aviso <span className="text-perigo">*</span></legend>
+            {radio("reducao", "2h_dia", f.reducao, () => setF({ ...f, reducao: "2h_dia", ultimo: "" }), "Sai 2 horas mais cedo por dia", "Trabalha todos os dias do aviso com jornada reduzida")}
+            {radio("reducao", "7_dias", f.reducao, () => setF({ ...f, reducao: "7_dias", ultimo: "" }), "Sai 7 dias antes", "Trabalha jornada normal e deixa de trabalhar nos últimos 7 dias corridos")}
+          </fieldset>
+        )}
+        {comAviso && f.aviso && (
+          <div className="grid gap-4 rounded-lg bg-fundo p-3 sm:grid-cols-2">
+            <div className="text-sm">
+              <p className="text-xs text-texto-suave">Aviso prévio</p>
+              <p className="font-medium">{Math.ceil(dias)} dias · até {data(fimAviso)}</p>
+              {f.modalidade === "sem_justa_causa" && <p className="text-xs text-texto-suave">30 dias + 3 por ano completo de empresa</p>}
+              {f.modalidade === "acordo" && <p className="text-xs text-texto-suave">Metade do aviso, no acordo</p>}
+            </div>
+            <Campo rotulo="Último dia de trabalho" type="date" value={ultimo} onChange={(e) => setF({ ...f, ultimo: e.target.value })} obrigatorio
+              dica="Calculado; ajuste se foi combinado outro dia" />
+          </div>
+        )}
         <AreaTexto rotulo="Observações" value={f.obs} onChange={(e) => setF({ ...f, obs: e.target.value })} />
-        <Rodape fechar={fechar} carregando={m.isPending} texto="Iniciar" desabilitado={!f.modalidade} />
+        <Aviso tom="info">Confirme os cálculos da rescisão com a contabilidade.</Aviso>
+        <Rodape fechar={fechar} carregando={m.isPending} texto="Iniciar" desabilitado={!valido} />
       </form>
     </Modal>
   );
 }
 
-function ConcluirDesligamento({ c, id, fechar }: { c: ColaboradorLinha; id: string; fechar: () => void }) {
-  const [d, setD] = useState(hoje());
+const AVISO_ROTULO: Record<string, string> = {
+  trabalhado: "Aviso trabalhado", indenizado: "Aviso indenizado", dispensado: "Empresa dispensou o cumprimento", nao_cumpre: "Não vai cumprir o aviso",
+};
+
+function ConcluirDesligamento({ c, id, ultimoDia, fechar }: { c: ColaboradorLinha; id: string; ultimoDia: string | null; fechar: () => void }) {
+  const [d, setD] = useState(ultimoDia ?? hoje());
   const [ok, setOk] = useState(false);
   const m = useMutation(useAcao(c, fechar, "Desligamento concluído. O cadastro e os documentos continuam guardados.")(() =>
     supabase.rpc("concluir_desligamento", { p_desligamento: id, p_data_desligamento: d })));
