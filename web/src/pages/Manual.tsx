@@ -178,7 +178,7 @@ const SECOES: Secao[] = [
         <T>Pendências do RH</T>
         <P>O primeiro quadro do Painel junta tudo o que está esperando uma ação do RH, da mais urgente para a de rotina. Clique na linha para ver os nomes; o link à direita leva à tela onde se resolve. Cada pessoa só vê as pendências que a sua permissão e as suas lojas alcançam.</P>
         <Quadro cabecalho={["Pendência", "Quando aparece"]} linhas={[
-          ["Admissões com itens obrigatórios pendentes", "Colaborador sem algum dos 5 itens da admissão: cartão VR, uniforme, crachá, termo de uso de imagem e equipamento/EPI (urgente). O nome abre a ficha já na seção Admissão."],
+          ["Admissões com itens obrigatórios pendentes", "Colaborador sem algum dos 5 itens da admissão: cartão VR, uniforme, crachá, termo de uso de imagem e equipamento/EPI (entregue ou marcado como “não tem”) (urgente). O nome abre a ficha já na seção Admissão."],
           ["Contratos de experiência", "Experiência terminando em 7 dias ou já encerrada sem atualizar o contrato (urgente)."],
           ["Documentos aguardando conferência", "Documentos enviados ainda não aprovados nem reprovados."],
           ["Documentos vencidos / vencendo em 30 dias", "Documentos com vencimento (ex.: ASO) passado ou próximo, sem uma versão mais nova enviada."],
@@ -250,7 +250,7 @@ const SECOES: Secao[] = [
       <>
         <Passos itens={[
           <>Em <Menu>Colaboradores</Menu>, clique em <Menu>Novo colaborador</Menu>.</>,
-          <><B>Itens obrigatórios</B>: depois de cadastrar, vá à seção <Menu>Admissão</Menu> da ficha e conclua os 5 itens — cartão VR e crachá com <Menu>Registrar entrega</Menu>; uniforme e equipamento/EPI pelas abas Uniformes e Equipamentos (concluem sozinhos); termo de uso de imagem com <Menu>Imprimir termo</Menu> e depois <Menu>Anexar termo assinado</Menu>.</>,
+          <><B>Itens obrigatórios</B>: depois de cadastrar, vá à seção <Menu>Admissão</Menu> da ficha e conclua os 5 itens — cartão VR e crachá com <Menu>Registrar entrega</Menu>; uniforme e equipamento/EPI pelas abas Uniformes e Equipamentos (concluem sozinhos) — se a função não usa EPI, clique em <Menu>Não tem</Menu> no item de equipamento/EPI; termo de uso de imagem com <Menu>Imprimir termo</Menu> e depois <Menu>Anexar termo assinado</Menu>.</>,
           <><B>Pela ficha de admissão (opcional)</B>: clique em <Menu>Enviar ficha</Menu> e escolha o PDF ou a foto da ficha. A leitura automática preenche o formulário e marca com ✓ cada campo lido. Confira tudo, complete o que faltar (ex.: matrícula) e só então cadastre. A ficha é anexada aos documentos do colaborador.</>,
           <><B>Dados pessoais</B>: nome completo e CPF são obrigatórios. Nome social só se a pessoa usar. Endereço e contato de emergência podem ser preenchidos depois, na ficha.</>,
           <><B>Vínculo</B>: escolha a loja, a matrícula, o tipo de vínculo e a situação inicial (veja abaixo).</>,
