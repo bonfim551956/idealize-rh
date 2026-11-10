@@ -89,7 +89,8 @@ ${listaCategorias}
 - Datas no formato AAAA-MM-DD. Competência (mês de referência) no formato AAAA-MM.
 - "pessoa_nome" e "pessoa_cpf" são do EMPREGADO a quem o documento se refere (não do médico, da empresa ou do contador).
 - "nome_documento": título curto e claro em português, por exemplo "ASO ADMISSIONAL", "HOLERITE 09/2026", "ATESTADO MÉDICO".
-- Não inclua diagnóstico, CID ou detalhe de saúde em nenhum campo.
+- Não inclua diagnóstico ou detalhe de saúde em nenhum campo. A ÚNICA exceção é o campo "cid": se o documento for atestado médico ou declaração de comparecimento e trouxer um código CID escrito (ex.: "Z00.0", "J11"), copie só o código nesse campo; nunca deduza um CID que não esteja escrito.
+- "horario_inicio" e "horario_fim": em atestados e declarações de comparecimento/horas, o horário de início e de fim escrito no documento (formato HH:MM, 24 horas). Se não houver, deixe vazio.
 - Confiança: "alta" se o tipo do documento é inequívoco; "media" se há alguma dúvida; "baixa" se ilegível ou ambíguo.
 Hoje é ${hoje}.`;
 
@@ -105,6 +106,9 @@ Hoje é ${hoje}.`;
         data_emissao: { type: "string", description: "AAAA-MM-DD ou vazio" },
         competencia: { type: "string", description: "AAAA-MM ou vazio" },
         vencimento: { type: "string", description: "AAAA-MM-DD ou vazio (ex.: validade do ASO)" },
+        horario_inicio: { type: "string", description: "HH:MM ou vazio" },
+        horario_fim: { type: "string", description: "HH:MM ou vazio" },
+        cid: { type: "string", description: "Código CID escrito no documento, ou vazio" },
         pessoa_nome: { type: "string", description: "Nome do empregado ou vazio" },
         pessoa_cpf: { type: "string", description: "CPF do empregado (só dígitos) ou vazio" },
         justificativa: { type: "string", description: "Uma frase curta explicando a escolha, sem dados de saúde" },
@@ -172,6 +176,17 @@ Hoje é ${hoje}.`;
     else if ((data?.length ?? 0) > 1) multiplos = true;
   }
 
+  function horaHHMM(v: unknown): string | null {
+    const m = String(v ?? "").trim().match(/^(\d{1,2})[:hH](\d{2})$/);
+    if (!m) return null;
+    const h = Number(m[1]), mi = Number(m[2]);
+    return h < 24 && mi < 60 ? `${String(h).padStart(2, "0")}:${m[2]}` : null;
+  }
+  function codigoCID(v: unknown): string | null {
+    const c = String(v ?? "").trim().toUpperCase().replace(/\s/g, "");
+    return /^[A-Z]\d{2}(\.?\d{1,2})?$/.test(c) ? c : null;
+  }
+
   const sugestao = {
     categoria_id: cat.id,
     categoria_codigo: cat.codigo,
@@ -183,6 +198,10 @@ Hoje é ${hoje}.`;
     data_emissao: dataISO(uso.data_emissao),
     competencia: mesISO(uso.competencia),
     vencimento: dataISO(uso.vencimento),
+    horario_inicio: horaHHMM(uso.horario_inicio),
+    horario_fim: horaHHMM(uso.horario_fim),
+    // CID só volta em categoria de saúde (sigilosa) e só se tiver formato de código
+    cid: cat.nivel_sigilo === "saude" ? codigoCID(uso.cid) : null,
     confianca,
     justificativa: texto(uso.justificativa, 300),
   };

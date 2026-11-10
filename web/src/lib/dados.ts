@@ -21,6 +21,7 @@ export type DocumentoLinha = {
   colaborador_id: string | null; colaborador_nome: string | null; loja_id: string; loja_nome: string;
   data_emissao: string | null; data_recebimento: string | null; competencia: string | null; vencimento: string | null;
   status: string; status_assinatura: string; versao_atual: number; observacoes: string | null; criado_em: string;
+  categoria_codigo?: string; horario_inicio?: string | null; horario_fim?: string | null; cid?: string | null;
 };
 
 function falhar<T>(r: { data: T | null; error: { message: string } | null }): T {

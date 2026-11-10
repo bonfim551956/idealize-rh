@@ -12,7 +12,9 @@ const MAX_ARQUIVOS = 30;
 const LEITURAS_SIMULTANEAS = 3;
 
 type Colab = Pick<ColaboradorLinha, "id" | "nome_completo" | "loja_atual_id" | "loja_nome">;
-type Meta = { categoria_id: string; nome: string; data_emissao: string; competencia: string; vencimento: string; colaborador: Colab | null };
+type Meta = { categoria_id: string; nome: string; data_emissao: string; competencia: string; vencimento: string; colaborador: Colab | null;
+  horario_inicio?: string; horario_fim?: string; cid?: string };
+const COM_HORARIO_CID = ["atestados_medicos", "declaracao_comparecimento"];
 type Estado = "lendo" | "pronto" | "manual" | "enviando" | "enviado" | "falhou";
 type Item = {
   id: string; arquivo: File; estado: Estado; meta: Meta;
@@ -20,7 +22,8 @@ type Item = {
   erro?: string;
 };
 type RespostaIA = {
-  sugestao: { categoria_id: string; nome: string; data_emissao: string | null; competencia: string | null; vencimento: string | null; confianca: string; justificativa: string | null };
+  sugestao: { categoria_id: string; nome: string; data_emissao: string | null; competencia: string | null; vencimento: string | null; confianca: string; justificativa: string | null;
+    horario_inicio?: string | null; horario_fim?: string | null; cid?: string | null };
   pessoa: { nome: string | null; cpf_mascarado: string | null };
   colaborador: Colab | null;
   multiplos: boolean;
@@ -130,6 +133,9 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
                 data_emissao: r.sugestao.data_emissao ?? "",
                 competencia: r.sugestao.competencia ?? "",
                 vencimento: r.sugestao.vencimento ?? "",
+                horario_inicio: r.sugestao.horario_inicio ?? "",
+                horario_fim: r.sugestao.horario_fim ?? "",
+                cid: r.sugestao.cid ?? "",
                 colaborador: fixo ?? r.colaborador ?? i.meta.colaborador,
               },
               ia: {
@@ -181,6 +187,10 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
     if (!pode(`documento.${c.nivel_sigilo}.enviar`, i.meta.colaborador.loja_atual_id)) return "Você não pode enviar esta categoria para a loja deste colaborador";
     if (c.exige_competencia && !i.meta.competencia) return "Informe a competência (mês)";
     if (c.exige_vencimento && !i.meta.vencimento) return "Informe o vencimento";
+    if (COM_HORARIO_CID.includes(c.codigo)) {
+      if (i.meta.horario_inicio && i.meta.horario_fim && i.meta.horario_fim <= i.meta.horario_inicio) return "O horário final deve ser depois do inicial";
+      if (i.meta.cid && !/^[A-Z]\d{2}(\.?\d{1,2})?$/.test(i.meta.cid.trim().toUpperCase())) return "CID inválido (ex.: Z00.0)";
+    }
     return null;
   }
   const pendentes = itens.filter((i) => i.estado !== "enviado");
@@ -200,6 +210,10 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
           categoria_id: i.meta.categoria_id, colaborador_id: i.meta.colaborador!.id,
           nome: (i.meta.nome || i.arquivo.name).toUpperCase(),
           data_emissao: i.meta.data_emissao || null, competencia: i.meta.competencia || null, vencimento: i.meta.vencimento || null,
+          ...(COM_HORARIO_CID.includes(catDe(i.meta.categoria_id)?.codigo ?? "") ? {
+            horario_inicio: i.meta.horario_inicio || null, horario_fim: i.meta.horario_fim || null,
+            cid: i.meta.cid?.trim().toUpperCase() || null,
+          } : {}),
         }));
         await chamarFuncao("documentos-upload", fd, false);
         atualizar(i.id, (x) => ({ ...x, estado: "enviado" }));
@@ -328,6 +342,14 @@ function CartaoItem({ item: i, fixo, colaboradores, problema, aoMudar, aoRemover
               <Campo rotulo="Vencimento" type="date" value={i.meta.vencimento} obrigatorio={cat?.exige_vencimento}
                 onChange={(e) => aoMudar({ vencimento: e.target.value })} />
             </div>
+            {cat && COM_HORARIO_CID.includes(cat.codigo) && (
+              <div className="grid grid-cols-3 gap-3 rounded-lg bg-fundo p-3 sm:col-span-2">
+                <Campo rotulo="Horário — de" type="time" value={i.meta.horario_inicio ?? ""} onChange={(e) => aoMudar({ horario_inicio: e.target.value })} />
+                <Campo rotulo="Horário — até" type="time" value={i.meta.horario_fim ?? ""} onChange={(e) => aoMudar({ horario_fim: e.target.value })} />
+                <Campo rotulo="CID" value={i.meta.cid ?? ""} onChange={(e) => aoMudar({ cid: e.target.value })} placeholder="Ex.: Z00.0" maxLength={10}
+                  dica="Sigiloso: só DP e diretoria veem" />
+              </div>
+            )}
           </div>
           {i.ia?.justificativa && <p className="mt-2 text-xs text-texto-suave"><Sparkles className="mr-1 inline size-3" />{i.ia.justificativa}</p>}
           {(problema || i.erro) && i.estado !== "lendo" && (

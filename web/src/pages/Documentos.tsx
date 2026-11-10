@@ -6,7 +6,7 @@ import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCategorias, useLojas, type ColaboradorLinha, type DocumentoLinha } from "../lib/dados";
 import { SIGILO, STATUS_DOCUMENTO, data, hoje } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
-import { AreaTexto, Aviso, Botao, CabecalhoPagina, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, useAvisos } from "../ui/componentes";
+import { AreaTexto, Aviso, Botao, CabecalhoPagina, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, useAvisos } from "../ui/componentes";
 import { EnvioDocumento } from "./EnvioDocumentos";
 
 
@@ -92,6 +92,12 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
                 <td className="px-4 py-3">
                   <p className="font-medium">{d.nome}</p>
                   <p className="text-xs text-texto-suave">{d.loja_nome} · v{d.versao_atual} · recebido {data(d.data_recebimento)}</p>
+                  {(d.horario_inicio || d.cid) && (
+                    <p className="text-xs text-texto-suave">
+                      {d.horario_inicio && <>Horário {hora(d.horario_inicio)}{d.horario_fim && ` às ${hora(d.horario_fim)}`}</>}
+                      {d.horario_inicio && d.cid && " · "}{d.cid && <>CID {d.cid}</>}
+                    </p>
+                  )}
                 </td>
                 {!colaborador && <td className="px-4 py-3">{d.colaborador_id ? <Link className="text-primaria hover:underline" to={`/colaboradores/${d.colaborador_id}`}>{d.colaborador_nome ?? "—"}</Link> : "—"}</td>}
                 <td className="px-4 py-3">{d.categoria_nome}<p className="text-xs text-texto-suave">Sigilo: {SIGILO[d.nivel_sigilo]}</p></td>
@@ -125,12 +131,28 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
   );
 }
 
+const hora = (t: string) => t.slice(0, 5);
+const COM_HORARIO_CID = ["atestados_medicos", "declaracao_comparecimento"];
+
 /* ---------------- Conferência ---------------- */
 function Conferencia({ doc, aoFechar, aoConcluir }: { doc: DocumentoLinha; aoFechar: () => void; aoConcluir: () => void }) {
   const avisar = useAvisos();
   const [obs, setObs] = useState("");
+  const comHorario = COM_HORARIO_CID.includes(doc.categoria_codigo ?? "");
+  const [ini, setIni] = useState(doc.horario_inicio ? hora(doc.horario_inicio) : "");
+  const [fim, setFim] = useState(doc.horario_fim ? hora(doc.horario_fim) : "");
+  const [cid, setCid] = useState(doc.cid ?? "");
+  const mudou = comHorario && (ini !== (doc.horario_inicio ? hora(doc.horario_inicio) : "") || fim !== (doc.horario_fim ? hora(doc.horario_fim) : "")
+    || cid.trim().toUpperCase() !== (doc.cid ?? ""));
   const m = useMutation({
     mutationFn: async (aprovado: boolean) => {
+      if (mudou) {
+        if (ini && fim && fim <= ini) throw new Error("O horário final deve ser depois do inicial");
+        const c = cid.trim().toUpperCase();
+        if (c && !/^[A-Z]\d{2}(\.?\d{1,2})?$/.test(c)) throw new Error("CID inválido (ex.: Z00.0)");
+        const r = await supabase.rpc("documento_ajustar_horario", { p_documento: doc.id, p_inicio: ini || null, p_fim: fim || null, p_cid: c || null });
+        if (r.error) throw r.error;
+      }
       const { error } = await supabase.rpc("documento_conferir", { p_documento: doc.id, p_aprovado: aprovado, p_observacao: obs || null });
       if (error) throw error;
       return aprovado;
@@ -142,6 +164,13 @@ function Conferencia({ doc, aoFechar, aoConcluir }: { doc: DocumentoLinha; aoFec
     <Modal aberto aoFechar={aoFechar} titulo="Conferir documento" descricao={`${doc.nome} · ${doc.colaborador_nome ?? doc.loja_nome}`}>
       <div className="flex flex-col gap-4">
         <Aviso tom="info">Abra o arquivo antes de decidir. Sua conferência fica registrada com nome e horário.</Aviso>
+        {comHorario && (
+          <div className="grid grid-cols-3 gap-3 rounded-lg bg-fundo p-3">
+            <Campo rotulo="Horário — de" type="time" value={ini} onChange={(e) => setIni(e.target.value)} />
+            <Campo rotulo="Horário — até" type="time" value={fim} onChange={(e) => setFim(e.target.value)} />
+            <Campo rotulo="CID" value={cid} onChange={(e) => setCid(e.target.value)} placeholder="Ex.: Z00.0" maxLength={10} dica="Sigiloso" />
+          </div>
+        )}
         <AreaTexto rotulo="Observação" value={obs} onChange={(e) => setObs(e.target.value)} dica="Obrigatória para reprovar." />
         <div className="flex flex-wrap justify-end gap-2">
           <Botao variante="perigo" icone={<XCircle className="size-4" />} carregando={m.isPending && m.variables === false}
