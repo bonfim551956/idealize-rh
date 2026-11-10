@@ -126,32 +126,45 @@ async function api(page, cab, metodo, caminho, corpo) {
   }, { url: caminho.startsWith("http") ? caminho : `${API}${caminho}`, metodo, cab, corpo });
 }
 
-async function gerarRelatorio(page, cab, inicio, fim) {
-  const base = "date,name,time_balance_resume,time_balance,overtime_missing_hours,extra_time";
-  for (const colunas of [`${base},registration_number,department`, base]) {
-    const r = await api(page, cab, "POST", "/api/html_reports/time_balances", { report: {
-      report_id: "time_balances", start_date: inicio, end_date: fim, columns: colunas,
-      row_filters: "has_time_balance", additional_row_filters: "", proposal_status: "", format: "html",
-      fabrication_number: "", initial_nsr: "", group_columns: "",
-    } });
-    if (r.status >= 400) { log(`relatório recusado (${r.status}) com colunas extras; tentando o padrão`); continue; }
-    const job = JSON.parse(r.texto).job_id;
-    if (!job) throw new Erro("O Pontomais não devolveu o número do relatório");
-    for (let i = 0; i < 60; i++) {
-      await espera(3000);
-      const j = await api(page, cab, "GET", `/api/users/jobs/${job}`);
-      const dados = JSON.parse(j.texto).job;
-      if (dados?.has_err) throw new Erro(`O Pontomais falhou ao gerar o relatório: ${String(dados.err_msg || "").slice(0, 120)}`);
-      const url = dados?.result?.report_url;
-      if (dados?.status?.id === 3 && url) {
-        const html = await api(page, cab, "GET", url.startsWith("//") ? `https:${url}` : url);
-        if (html.status >= 400) throw new Erro(`Não consegui baixar o relatório (${html.status})`);
-        return html.texto;
-      }
+/* pede um relatório HTML ao Pontomais, espera ficar pronto e baixa */
+async function relatorioHtml(page, cab, tipo, report) {
+  const r = await api(page, cab, "POST", `/api/html_reports/${tipo}`, { report: {
+    report_id: tipo, row_filters: "", additional_row_filters: "", proposal_status: "", format: "html",
+    fabrication_number: "", initial_nsr: "", group_columns: "", ...report } });
+  if (r.status >= 400) return { recusado: r.status };
+  const job = JSON.parse(r.texto).job_id;
+  if (!job) throw new Erro("O Pontomais não devolveu o número do relatório");
+  for (let i = 0; i < 60; i++) {
+    await espera(3000);
+    const j = await api(page, cab, "GET", `/api/users/jobs/${job}`);
+    const dados = JSON.parse(j.texto).job;
+    if (dados?.has_err) throw new Erro(`O Pontomais falhou ao gerar o relatório: ${String(dados.err_msg || "").slice(0, 120)}`);
+    const url = dados?.result?.report_url;
+    if (dados?.status?.id === 3 && url) {
+      const html = await api(page, cab, "GET", url.startsWith("//") ? `https:${url}` : url);
+      if (html.status >= 400) throw new Erro(`Não consegui baixar o relatório (${html.status})`);
+      return { html: html.texto };
     }
-    throw new Erro("O relatório do Pontomais demorou demais");
   }
-  throw new Erro("O Pontomais recusou o pedido do relatório");
+  throw new Erro("O relatório do Pontomais demorou demais");
+}
+
+async function gerarBancoHoras(page, cab, inicio, fim) {
+  const base = "date,name,time_balance_resume,time_balance,overtime_missing_hours,extra_time";
+  for (const columns of [`${base},registration_number,department`, base]) {
+    const r = await relatorioHtml(page, cab, "time_balances", { start_date: inicio, end_date: fim, columns, row_filters: "has_time_balance" });
+    if (r.html) return r.html;
+    log(`banco de horas recusado (${r.recusado}); tentando com as colunas padrão`);
+  }
+  throw new Erro("O Pontomais recusou o pedido do relatório de banco de horas");
+}
+
+async function gerarPendencias(page, cab, inicio, fim) {
+  const r = await relatorioHtml(page, cab, "pendencies", { start_date: inicio, end_date: fim,
+    columns: "date,employee_name,pendencies,status",
+    additional_row_filters: "allowance,proposal,unjustified_missing_day,wrong_number_of_time_cards" });
+  if (!r.html) { log(`relatório de pendências recusado (${r.recusado}); seguindo só com o banco de horas`); return null; }
+  return r.html;
 }
 
 /* ---------------- Leitura do HTML do relatório ---------------- */
@@ -160,6 +173,26 @@ const minutos = (t) => {
   return m ? (m[1] ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : null;
 };
 const dataISO = (t) => { const m = String(t || "").match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+
+/* tabela com cabeçalho "Nome | Data | Pendência | Status" */
+export function lerPendencias(html) {
+  const doc = parse(html); const lista = [];
+  for (const tabela of doc.querySelectorAll("table")) {
+    let col = null;
+    for (const tr of tabela.querySelectorAll("tr")) {
+      const cel = tr.querySelectorAll("th,td").map((c) => c.text.replace(/\s+/g, " ").trim());
+      if (!col) {
+        const nome = cel.findIndex((c) => /^nome$/i.test(c)), data = cel.findIndex((c) => /^data$/i.test(c)), pend = cel.findIndex((c) => /^pend[eê]ncia/i.test(c));
+        if (nome >= 0 && data >= 0 && pend >= 0) col = { nome, data, pend, status: cel.findIndex((c) => /^status$/i.test(c)) };
+        continue;
+      }
+      const data = dataISO(cel[col.data]);
+      if (!data || !cel[col.nome] || !cel[col.pend]) continue;
+      lista.push({ nome: cel[col.nome], data, pendencia: cel[col.pend], status: col.status >= 0 ? cel[col.status] : null });
+    }
+  }
+  return lista;
+}
 
 export function lerRelatorio(html) {
   const doc = parse(html);
@@ -193,11 +226,11 @@ export function lerRelatorio(html) {
 }
 
 /* ---------------- Envio para o RH 360 ---------------- */
-async function enviar(execucao, linhas) {
+async function enviar(execucao, linhas, pendencias = null) {
   const r = await fetch(`${env("RH_SUPABASE_URL")}/rest/v1/rpc/banco_horas_receber`, {
     method: "POST",
     headers: { apikey: env("RH_SUPABASE_CHAVE_PUBLICA"), "Content-Type": "application/json" },
-    body: JSON.stringify({ p_chave: env("RH_ROBO_CHAVE"), p_execucao: execucao, p_linhas: linhas }),
+    body: JSON.stringify({ p_chave: env("RH_ROBO_CHAVE"), p_execucao: execucao, p_linhas: linhas, p_pendencias: pendencias }),
   });
   if (!r.ok) throw new Error(`RH 360 recusou o envio (${r.status})`);
   return r.json();
@@ -216,12 +249,13 @@ async function principal() {
     const page = await ctx.newPage();
     await entrar(page);
     const cab = await sessaoPontomais(page);
-    const html = await gerarRelatorio(page, cab, periodo.periodo_inicio, periodo.periodo_fim);
-    const linhas = lerRelatorio(html);
-    if (!linhas.length) throw new Erro("O relatório veio sem linhas (layout mudou?)");
-    const pessoas = new Set(linhas.map((l) => l.nome)).size;
-    log(`relatório lido: ${linhas.length} linhas, ${pessoas} pessoas`);
-    const r = await enviar({ status: "ok", ...periodo }, linhas);
+    const linhas = lerRelatorio(await gerarBancoHoras(page, cab, periodo.periodo_inicio, periodo.periodo_fim));
+    if (!linhas.length) throw new Erro("O relatório de banco de horas veio sem linhas (layout mudou?)");
+    log(`banco de horas lido: ${linhas.length} linhas, ${new Set(linhas.map((l) => l.nome)).size} pessoas`);
+    const htmlPend = await gerarPendencias(page, cab, periodo.periodo_inicio, periodo.periodo_fim);
+    const pendencias = htmlPend ? lerPendencias(htmlPend) : null;
+    if (pendencias) log(`pendências lidas: ${pendencias.length}`);
+    const r = await enviar({ status: "ok", ...periodo }, linhas, pendencias);
     log(`enviado ao RH 360: ${r.linhas} linhas, ${r.pessoas} pessoas`);
   } catch (e) {
     const msg = e instanceof Erro ? e.message : `Erro inesperado: ${String(e?.message || e).split("\n")[0].slice(0, 200)}`;

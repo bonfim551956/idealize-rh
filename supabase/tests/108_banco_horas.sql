@@ -23,7 +23,9 @@ do $$ begin
   perform public.banco_horas_receber('chave-teste-108', '{"status":"ok","periodo_inicio":"2026-11-01","periodo_fim":"2026-11-10"}',
     '[{"nome":"ADILMA BATISTA ROCHA","departamento":"SOROCABA - OPERAÇÕES","data":"2026-11-09","saldo_min":-6207,"positivas_min":0,"negativas_min":-475},
       {"nome":"Adilma Batista Rocha","data":"2026-11-10","saldo_min":-6200,"positivas_min":7,"negativas_min":0},
-      {"nome":"JOÃO S. N. IGUAL","data":"2026-11-10","saldo_min":300,"positivas_min":60,"negativas_min":0}]');
+      {"nome":"JOÃO S. N. IGUAL","data":"2026-11-10","saldo_min":300,"positivas_min":60,"negativas_min":0}]',
+    jsonb_build_array(jsonb_build_object('nome','Adilma Batista Rocha','data',current_date - 2,'pendencia','Numero errado de pontos','status','Colaborador pedir ajuste'),
+                      jsonb_build_object('nome','Adilma Batista Rocha','data',current_date - 3,'pendencia','Ajuste','status','Aprovado')));
   begin perform 1 from public.banco_horas_saldos; raise exception 'FALHOU anon leu tabela';
   exception when insufficient_privilege then null; end;
   raise notice 'ok  - robô grava com a chave certa; recusa chave errada';
@@ -37,7 +39,11 @@ do $$ declare r jsonb := public.banco_horas_resumo(null); begin
   perform public.banco_horas_vincular(r->'sem_vinculo'->0->>'nome_norm', current_setting('teste.joao')::uuid);
   r := public.banco_horas_resumo(null);
   if jsonb_array_length(r->'linhas') <> 2 or jsonb_array_length(r->'sem_vinculo') <> 0 then raise exception 'FALHOU vincular: %', r; end if;
-  if jsonb_array_length(public.banco_horas_historico(current_setting('teste.adi')::uuid, 30)) <> 2 then raise exception 'FALHOU histórico'; end if;
+  if jsonb_array_length(public.banco_horas_historico(current_setting('teste.adi')::uuid, 400)->'dias') <> 2
+     or jsonb_array_length(public.banco_horas_historico(current_setting('teste.adi')::uuid, 30)->'pendencias') <> 2 then raise exception 'FALHOU histórico'; end if;
+  if jsonb_array_length(r->'pendencias') <> 1 or r->'pendencias'->0->>'tipo' <> 'registro_faltando' then raise exception 'FALHOU pendências: %', r->'pendencias'; end if;
+  if not exists (select 1 from jsonb_array_elements(public.painel_pendencias(null)->'pendencias') x where x->>'chave' = 'banco_horas_registros')
+    then raise exception 'FALHOU painel registros'; end if;
   raise notice 'ok  - casa pelo nome, vínculo manual, histórico';
 end $$;
 select set_config('request.jwt.claims', json_build_object('sub',:'ger','aal','aal2')::text, true);

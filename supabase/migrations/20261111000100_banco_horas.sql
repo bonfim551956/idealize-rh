@@ -46,6 +46,20 @@ create table public.banco_horas_saldos (
 );
 create index on public.banco_horas_saldos (data);
 
+-- pendências de ponto do VR (relatório "Pendências"): registro faltando, falta não justificada, ajuste, abono
+create table public.banco_horas_pendencias (
+  id            bigint generated always as identity primary key,
+  nome_norm     text not null,
+  nome_vr       text not null,
+  data          date not null,
+  tipo          text not null check (tipo in ('registro_faltando', 'falta', 'ajuste', 'abono', 'outro')),
+  descricao     text not null,
+  status        text,
+  execucao_id   uuid not null references public.banco_horas_execucoes(id)
+);
+create index on public.banco_horas_pendencias (nome_norm, data);
+create index on public.banco_horas_pendencias (data);
+
 -- vínculo manual nome do VR -> colaborador (quando o nome não bate)
 create table public.banco_horas_vinculos (
   nome_norm       text primary key,
@@ -59,7 +73,8 @@ create trigger auditar after insert or update or delete on public.banco_horas_vi
 alter table public.banco_horas_execucoes enable row level security;
 alter table public.banco_horas_saldos enable row level security;
 alter table public.banco_horas_vinculos enable row level security;
-revoke all on public.banco_horas_execucoes, public.banco_horas_saldos, public.banco_horas_vinculos from anon, authenticated;
+alter table public.banco_horas_pendencias enable row level security;
+revoke all on public.banco_horas_execucoes, public.banco_horas_saldos, public.banco_horas_vinculos, public.banco_horas_pendencias from anon, authenticated;
 
 -- nome do VR -> colaborador (vínculo manual tem prioridade; senão, nome igual e único)
 create or replace function privado.bh_colaborador(p_nome_norm text) returns uuid
@@ -76,8 +91,9 @@ revoke all on function privado.bh_colaborador(text) from public, anon, authentic
 -- Entrada do robô (anon + chave própria)
 -- p_execucao: {status:'ok'|'erro', mensagem, periodo_inicio, periodo_fim}
 -- p_linhas:   [{nome, departamento, matricula, data, saldo_min, positivas_min, negativas_min, he50_min, he100_min}]
+-- p_pendencias: [{nome, data, pendencia, status}]  (substitui as pendências do período lido)
 -- ---------------------------------------------------------------------
-create or replace function public.banco_horas_receber(p_chave text, p_execucao jsonb, p_linhas jsonb default '[]')
+create or replace function public.banco_horas_receber(p_chave text, p_execucao jsonb, p_linhas jsonb default '[]', p_pendencias jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_id uuid; v_n int := 0; v_p int := 0; l jsonb;
 begin
@@ -110,20 +126,42 @@ begin
           he50_min = excluded.he50_min, he100_min = excluded.he100_min, execucao_id = v_id, atualizado_em = now();
       v_n := v_n + 1;
     end loop;
+    if jsonb_typeof(p_pendencias) = 'array' and nullif(p_execucao->>'periodo_inicio', '') is not null then
+      delete from public.banco_horas_pendencias
+       where data between (p_execucao->>'periodo_inicio')::date and coalesce(nullif(p_execucao->>'periodo_fim', '')::date, current_date);
+      insert into public.banco_horas_pendencias (nome_norm, nome_vr, data, tipo, descricao, status, execucao_id)
+      select privado.bh_normal(x->>'nome'), upper(left(trim(x->>'nome'), 150)), (x->>'data')::date,
+             case when x->>'pendencia' ~* 'n[uú]mero errado|registro' then 'registro_faltando'
+                  when x->>'pendencia' ~* 'falta' then 'falta'
+                  when x->>'pendencia' ~* 'ajuste' then 'ajuste'
+                  when x->>'pendencia' ~* 'abono' then 'abono' else 'outro' end,
+             left(trim(x->>'pendencia'), 120), left(nullif(trim(x->>'status'), ''), 80), v_id
+        from jsonb_array_elements(p_pendencias) x
+       where privado.bh_normal(x->>'nome') is not null and nullif(x->>'data', '') is not null and nullif(trim(x->>'pendencia'), '') is not null;
+    end if;
     select count(distinct nome_norm) into v_p from public.banco_horas_saldos where execucao_id = v_id;
     update public.banco_horas_execucoes set linhas = v_n, pessoas = v_p where id = v_id;
   end if;
   return jsonb_build_object('execucao_id', v_id, 'linhas', v_n, 'pessoas', v_p);
 end $$;
-revoke all on function public.banco_horas_receber(text, jsonb, jsonb) from public;
-grant execute on function public.banco_horas_receber(text, jsonb, jsonb) to anon, authenticated;
+revoke all on function public.banco_horas_receber(text, jsonb, jsonb, jsonb) from public;
+grant execute on function public.banco_horas_receber(text, jsonb, jsonb, jsonb) to anon, authenticated;
+
+-- pendência "em aberto": registro faltando / falta sempre; ajuste e abono só enquanto pendentes
+create or replace function privado.bh_pend_aberta(p_tipo text, p_status text) returns boolean
+language sql immutable set search_path = '' as $$
+  select case when p_tipo in ('registro_faltando', 'falta') then coalesce(p_status, '') !~* 'aprovad|justificad|abonad'
+              when p_tipo in ('ajuste', 'abono') then coalesce(p_status, '') ~* 'pendente'
+              else false end
+$$;
+revoke all on function privado.bh_pend_aberta(text, text) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- Leitura para a tela
 -- ---------------------------------------------------------------------
 create or replace function public.banco_horas_resumo(p_loja uuid default null)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_ult jsonb; v_ok jsonb; v_lin jsonb; v_sem jsonb; v_mes date := date_trunc('month', current_date)::date;
+declare v_ult jsonb; v_ok jsonb; v_lin jsonb; v_sem jsonb; v_pend jsonb; v_mes date := date_trunc('month', current_date)::date;
 begin
   if not privado.pode_em_alguma('colaborador.ler') then raise exception 'Acesso negado' using errcode = '42501'; end if;
   select to_jsonb(e) into v_ult from public.banco_horas_execucoes e order by e.executado_em desc limit 1;
@@ -133,20 +171,41 @@ begin
     select distinct on (s.nome_norm) s.*, privado.bh_colaborador(s.nome_norm) as colab
       from public.banco_horas_saldos s order by s.nome_norm, s.data desc),
   mes as (
-    select s.nome_norm, sum(s.positivas_min) pos, sum(s.negativas_min) neg,
-           (array_agg(s.saldo_min - s.positivas_min - s.negativas_min order by s.data))[1] as saldo_inicio
-      from public.banco_horas_saldos s where s.data >= v_mes group by s.nome_norm)
+    select s.nome_norm, sum(s.positivas_min) pos, sum(s.negativas_min) neg
+      from public.banco_horas_saldos s where s.data >= v_mes group by s.nome_norm),
+  sete as (   -- saldo de 7 dias antes do último dia lido
+    select u.nome_norm,
+           (select s.saldo_min from public.banco_horas_saldos s where s.nome_norm = u.nome_norm and s.data <= u.data - 7
+             order by s.data desc limit 1) as saldo_7
+      from ult u),
+  pend as (
+    select p.nome_norm, count(*) filter (where p.tipo in ('registro_faltando', 'falta')) as registros
+      from public.banco_horas_pendencias p
+     where p.data >= current_date - 7 and privado.bh_pend_aberta(p.tipo, p.status) group by p.nome_norm)
   select coalesce(jsonb_agg(jsonb_build_object(
            'nome_norm', u.nome_norm, 'nome_vr', u.nome_vr, 'departamento', u.departamento,
            'colaborador_id', c.id, 'colaborador_nome', c.nome_completo, 'loja_id', c.loja_atual_id, 'loja_nome', l.nome,
            'data', u.data, 'saldo_min', u.saldo_min,
-           'mes_positivas_min', coalesce(m.pos, 0), 'mes_negativas_min', coalesce(m.neg, 0), 'mes_saldo_inicio_min', m.saldo_inicio)
+           'mes_positivas_min', coalesce(m.pos, 0), 'mes_negativas_min', coalesce(m.neg, 0),
+           'var7_min', u.saldo_min - st.saldo_7, 'registros_7d', coalesce(pd.registros, 0))
            order by u.saldo_min), '[]')
     into v_lin
     from ult u join public.colaboradores c on c.id = u.colab
     left join public.lojas l on l.id = c.loja_atual_id
     left join mes m on m.nome_norm = u.nome_norm
+    left join sete st on st.nome_norm = u.nome_norm
+    left join pend pd on pd.nome_norm = u.nome_norm
    where (p_loja is null or c.loja_atual_id = p_loja) and privado.pode('colaborador.ler', c.loja_atual_id);
+
+  -- registros de ponto em aberto (últimos 35 dias)
+  select coalesce(jsonb_agg(jsonb_build_object('colaborador_id', c.id, 'colaborador_nome', c.nome_completo, 'loja_nome', l.nome,
+           'data', p.data, 'tipo', p.tipo, 'descricao', p.descricao, 'status', p.status) order by p.data desc, c.nome_completo), '[]')
+    into v_pend
+    from public.banco_horas_pendencias p
+    join public.colaboradores c on c.id = privado.bh_colaborador(p.nome_norm)
+    left join public.lojas l on l.id = c.loja_atual_id
+   where p.data >= current_date - 35 and privado.bh_pend_aberta(p.tipo, p.status)
+     and (p_loja is null or c.loja_atual_id = p_loja) and privado.pode('colaborador.ler', c.loja_atual_id);
 
   if privado.pode_em_alguma('colaborador.editar') then
     with ult as (select distinct on (s.nome_norm) s.* from public.banco_horas_saldos s order by s.nome_norm, s.data desc)
@@ -155,7 +214,8 @@ begin
       into v_sem from ult u where privado.bh_colaborador(u.nome_norm) is null;
   end if;
 
-  return jsonb_build_object('ultima_execucao', v_ult, 'ultima_ok', v_ok, 'linhas', v_lin, 'sem_vinculo', coalesce(v_sem, '[]'));
+  return jsonb_build_object('ultima_execucao', v_ult, 'ultima_ok', v_ok, 'linhas', v_lin, 'pendencias', v_pend,
+                            'sem_vinculo', coalesce(v_sem, '[]'));
 end $$;
 revoke all on function public.banco_horas_resumo(uuid) from public, anon;
 grant execute on function public.banco_horas_resumo(uuid) to authenticated;
@@ -163,14 +223,20 @@ grant execute on function public.banco_horas_resumo(uuid) to authenticated;
 -- histórico diário de uma pessoa (ficha / detalhe)
 create or replace function public.banco_horas_historico(p_colaborador uuid, p_dias int default 60)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v_dias int := least(greatest(p_dias, 1), 400);
 begin
   if not privado.pode('colaborador.ler', privado.loja_do_colaborador(p_colaborador)) then
     raise exception 'Acesso negado' using errcode = '42501';
   end if;
-  return (select coalesce(jsonb_agg(jsonb_build_object('data', s.data, 'saldo_min', s.saldo_min, 'positivas_min', s.positivas_min,
-            'negativas_min', s.negativas_min, 'he50_min', s.he50_min, 'he100_min', s.he100_min) order by s.data desc), '[]')
-            from public.banco_horas_saldos s
-           where privado.bh_colaborador(s.nome_norm) = p_colaborador and s.data >= current_date - least(greatest(p_dias, 1), 400));
+  return jsonb_build_object(
+    'dias', (select coalesce(jsonb_agg(jsonb_build_object('data', s.data, 'saldo_min', s.saldo_min, 'positivas_min', s.positivas_min,
+              'negativas_min', s.negativas_min, 'he50_min', s.he50_min, 'he100_min', s.he100_min) order by s.data desc), '[]')
+              from public.banco_horas_saldos s
+             where privado.bh_colaborador(s.nome_norm) = p_colaborador and s.data >= current_date - v_dias),
+    'pendencias', (select coalesce(jsonb_agg(jsonb_build_object('data', p.data, 'tipo', p.tipo, 'descricao', p.descricao, 'status', p.status,
+              'aberta', privado.bh_pend_aberta(p.tipo, p.status)) order by p.data desc), '[]')
+              from public.banco_horas_pendencias p
+             where privado.bh_colaborador(p.nome_norm) = p_colaborador and p.data >= current_date - v_dias));
 end $$;
 revoke all on function public.banco_horas_historico(uuid, int) from public, anon;
 grant execute on function public.banco_horas_historico(uuid, int) to authenticated;
@@ -200,6 +266,12 @@ grant execute on function public.banco_horas_vincular(text, uuid) to authenticat
 -- ---------------------------------------------------------------------
 -- Pendência no Painel: robô sem atualizar há mais de 2 dias (ou com erro)
 -- ---------------------------------------------------------------------
+create or replace function privado.bh_horas(m int) returns text
+language sql immutable set search_path = '' as $$
+  select case when m < 0 then '-' when m > 0 then '+' else '' end || (abs(m) / 60) || 'h' || lpad((abs(m) % 60)::text, 2, '0')
+$$;
+revoke all on function privado.bh_horas(int) from public, anon, authenticated;
+
 do $do$ declare d text; bloco text; begin
   d := pg_get_functiondef('public.painel_pendencias(uuid)'::regprocedure);
   if position('banco_horas' in d) > 0 then raise exception 'já aplicado'; end if;
@@ -216,6 +288,35 @@ do $do$ declare d text; bloco text; begin
                     from public.banco_horas_execucoes e order by e.executado_em desc limit 1), '—'),
         'link', '/banco-horas')));
   end if;
+
+  -- Banco de horas: registro de ponto faltando / falta não justificada nos últimos 7 dias
+  select count(*), coalesce(jsonb_agg(x) filter (where rn <= 6), '[]') into n, itens from (
+    select jsonb_build_object('nome', c.nome_completo,
+             'detalhe', count(*) || ' registro(s) em aberto · último em ' || to_char(max(p.data), 'DD/MM'),
+             'link', '/banco-horas?pessoa=' || c.id) x,
+           row_number() over (order by max(p.data) desc, c.nome_completo) rn
+      from public.banco_horas_pendencias p join public.colaboradores c on c.id = privado.bh_colaborador(p.nome_norm)
+     where p.data >= current_date - 7 and p.tipo in ('registro_faltando', 'falta') and privado.bh_pend_aberta(p.tipo, p.status)
+       and (p_loja is null or c.loja_atual_id = p_loja) and privado.pode('colaborador.ler', c.loja_atual_id)
+     group by c.id, c.nome_completo) s;
+  if n > 0 then r := r || jsonb_build_object('chave', 'banco_horas_registros', 'titulo', 'Registro de ponto faltando (últimos 7 dias)', 'gravidade', 'media',
+    'quantidade', n, 'link', '/banco-horas', 'acao', 'Ver banco de horas', 'itens', itens); end if;
+
+  -- Banco de horas subindo: +2h ou mais nos últimos 7 dias
+  select count(*), coalesce(jsonb_agg(x) filter (where rn <= 6), '[]') into n, itens from (
+    select jsonb_build_object('nome', c.nome_completo,
+             'detalhe', 'subiu ' || privado.bh_horas(q.var) || ' em 7 dias · saldo ' || privado.bh_horas(q.saldo_min),
+             'link', '/banco-horas?pessoa=' || c.id) x,
+           row_number() over (order by q.var desc) rn
+      from (select u.nome_norm, u.saldo_min,
+                   u.saldo_min - (select s.saldo_min from public.banco_horas_saldos s where s.nome_norm = u.nome_norm and s.data <= u.data - 7
+                                   order by s.data desc limit 1) as var
+              from (select distinct on (s.nome_norm) s.nome_norm, s.data, s.saldo_min from public.banco_horas_saldos s
+                     where s.data >= current_date - 3 order by s.nome_norm, s.data desc) u) q
+      join public.colaboradores c on c.id = privado.bh_colaborador(q.nome_norm)
+     where q.var >= 120 and (p_loja is null or c.loja_atual_id = p_loja) and privado.pode('colaborador.ler', c.loja_atual_id)) s;
+  if n > 0 then r := r || jsonb_build_object('chave', 'banco_horas_subindo', 'titulo', 'Banco de horas subindo (+2h ou mais em 7 dias)', 'gravidade', 'media',
+    'quantidade', n, 'link', '/banco-horas', 'acao', 'Ver banco de horas', 'itens', itens); end if;
 $b$;
   d := regexp_replace(d, '\nbegin\n', E'\nbegin\n' || replace(bloco, '\', '\\') || E'\n');
   if position('banco_horas' in d) = 0 then raise exception 'ponto de inserção não encontrado'; end if;
