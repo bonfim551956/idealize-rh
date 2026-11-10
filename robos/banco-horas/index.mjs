@@ -62,16 +62,27 @@ async function entrar(page) {
     throw new Erro(`A página de login da VR não abriu (${titulo || "sem título"}) — possível bloqueio de robô`);
   });
   log("página de login aberta");
-  await usuario.click();
-  await usuario.pressSequentially(env("VR_USUARIO"), { delay: 40 });
+  // fecha avisos que possam cobrir o formulário (cookies, banners)
+  for (const t of [/aceitar/i, /concordo/i, /fechar/i, /entendi/i]) {
+    const b = page.getByRole("button", { name: t }).first();
+    if (await b.isVisible().catch(() => false)) await b.click({ timeout: 3000 }).catch(() => {});
+  }
+  // o que está por cima do campo de usuário (só tag/classe; ajuda a diagnosticar)
+  const cobrindo = await usuario.evaluate((el) => {
+    const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    return top && top !== el && !el.contains(top) ? `${top.tagName.toLowerCase()}#${top.id}.${String(top.className).slice(0, 60)}` : "";
+  }).catch(() => "");
+  if (cobrindo) log(`algo cobre o formulário: ${cobrindo}`);
+  await usuario.focus();
+  await usuario.fill(env("VR_USUARIO"));
   const senha = page.locator('input[name="password"]');
   if (!(await senha.isVisible().catch(() => false))) {
     log("senha em outra etapa; avançando");
     await usuario.press("Enter");
     await senha.waitFor({ timeout: 30_000 });
   }
-  await senha.click();
-  await senha.pressSequentially(env("VR_SENHA"), { delay: 40 });
+  await senha.focus();
+  await senha.fill(env("VR_SENHA"));
   const antes = new Date();
   await senha.press("Enter");
   log("usuário e senha enviados");
@@ -90,8 +101,8 @@ async function entrar(page) {
     log("VR pediu código; lendo o Gmail");
     const codigo = await codigoDoGmail(antes);
     log("código encontrado no Gmail");
-    await campoCodigo.click();
-    await campoCodigo.pressSequentially(codigo, { delay: 60 });
+    await campoCodigo.focus();
+    await campoCodigo.fill(codigo);
     const lembrar = page.locator('input[type="checkbox"][name*="remember" i]');
     if (await lembrar.isVisible().catch(() => false)) await lembrar.check().catch(() => {});
     await campoCodigo.press("Enter");
