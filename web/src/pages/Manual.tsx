@@ -333,7 +333,7 @@ const SECOES: Secao[] = [
           ["Em desligamento", "Ativo (cancela o desligamento) · Desligado (só concluindo o processo)"],
           ["Desligado", "Arquivado"],
         ]} />
-        <Atencao>Em afastamentos e licenças, <B>não escreva diagnóstico nem CID</B> no motivo (use, por exemplo, “Afastamento por atestado médico”). O atestado vai como documento na categoria <B>Atestados médicos</B>, que é protegida (só DP, RH e diretoria).</Atencao>
+        <Atencao>Em afastamentos e licenças, <B>não escreva diagnóstico nem CID</B> no motivo (use, por exemplo, “Afastamento por atestado médico”). O atestado vai como documento na categoria <B>Atestados médicos</B> (ou <B>Declarações (comparecimento / horas)</B>), que é protegida (só DP, RH e diretoria). Nessas duas categorias há campos próprios para o <B>horário</B> e o <B>CID</B>, que ficam sigilosos e podem ser corrigidos na conferência.</Atencao>
         <Dica>Desistiu de um desligamento? Use <Menu>Mudar situação</Menu> → <B>Ativo</B> e explique no motivo. O processo fica registrado como cancelado.</Dica>
       </>
     ),
@@ -418,7 +418,8 @@ const SECOES: Secao[] = [
         <Passos itens={[
           <>Na ficha, em <B>Ações</B>, clique em <Menu>Iniciar desligamento</Menu>.</>,
           <>Escolha a modalidade: pedido de demissão, dispensa sem justa causa, dispensa por justa causa, acordo entre as partes, término de experiência, término de prazo determinado ou outra.</>,
-          <>Informe a data da comunicação e observações. A situação passa a <B>Em desligamento</B>.</>,
+          <>Informe a data da comunicação e como fica o <B>aviso prévio</B>. No pedido de demissão: vai cumprir, a empresa dispensa ou não vai cumprir. Nas dispensas: aviso trabalhado ou indenizado; se for trabalhado, escolha <B>sai 2 horas mais cedo por dia</B> ou <B>sai 7 dias antes</B>.</>,
+          <>O sistema calcula os dias do aviso (30 + 3 por ano completo, até 90) e sugere o <B>último dia de trabalho</B>; ajuste se foi combinado outro dia. A situação passa a <B>Em desligamento</B>.</>,
         ]} />
         <T>2. Providências (fora do sistema, por enquanto)</T>
         <Lista itens={[
