@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 import { supabase, mensagemErro } from "../lib/supabase";
 import { useAuth } from "../auth/AuthProvider";
+import { CENTRAL, embutidoNoCentral } from "../lib/central";
 import { Aviso, Botao, Campo, Carregando } from "../ui/componentes";
 
 function Moldura({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children: ReactNode }) {
@@ -21,73 +22,52 @@ function Moldura({ titulo, subtitulo, children }: { titulo: string; subtitulo?: 
   );
 }
 
-/* ---------------- Login ---------------- */
+/* ---------------- Login: agora é sempre pelo Central Idealize ---------------- */
+function irParaCentral(caminho: string) {
+  window.location.replace(`${CENTRAL}${caminho}`);
+}
+
 export function Login() {
   const { sessao, mfa, carregando } = useAuth();
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
+  const [segundos, setSegundos] = useState(3);
+  const fora = !embutidoNoCentral;
+
+  useEffect(() => {
+    if (carregando || sessao || !fora) return;
+    if (segundos <= 0) { irParaCentral("/s/rh"); return; }
+    const t = window.setTimeout(() => setSegundos((n) => n - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [carregando, sessao, fora, segundos]);
 
   if (carregando) return <Carregando />;
   if (sessao) return <Navigate to={mfa === "ok" ? "/" : "/mfa"} replace />;
 
-  async function entrar(e: FormEvent) {
-    e.preventDefault();
-    setErro(null); setEnviando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
-    setEnviando(false);
-    if (error) {
-      // mensagem genérica: não revela se o e-mail existe
-      setErro(/rate|too many/i.test(error.message)
-        ? "Muitas tentativas. Aguarde alguns minutos e tente de novo."
-        : "E-mail ou senha incorretos.");
-    }
+  // Dentro do Central e sem acesso recebido (ex.: sessão do Central encerrou)
+  if (!fora) {
+    return (
+      <Moldura titulo="Idealize RH 360º" subtitulo="Não recebemos o seu acesso do Central.">
+        <div className="flex flex-col gap-4">
+          <Aviso tom="alerta">Recarregue a página do Central. Se continuar, saia e entre de novo no Central.</Aviso>
+          <Botao onClick={() => window.location.reload()}>Tentar de novo</Botao>
+        </div>
+      </Moldura>
+    );
   }
 
   return (
-    <Moldura titulo="Idealize RH 360º" subtitulo="Entre com seu e-mail e senha">
-      <form onSubmit={entrar} className="flex flex-col gap-4" noValidate>
-        <Campo rotulo="E-mail" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} obrigatorio />
-        <Campo rotulo="Senha" type="password" autoComplete="current-password" value={senha} onChange={(e) => setSenha(e.target.value)} obrigatorio />
-        {erro && <Aviso tom="perigo">{erro}</Aviso>}
-        <Botao type="submit" carregando={enviando} disabled={!email || !senha} icone={<KeyRound className="size-4" />}>Entrar</Botao>
-        <Link to="/recuperar-senha" className="text-center text-sm text-primaria hover:underline">Esqueci minha senha</Link>
-      </form>
+    <Moldura titulo="Idealize RH 360º" subtitulo="O acesso agora é pelo Central Idealize. Use o mesmo e-mail e senha de sempre.">
+      <div className="flex flex-col gap-4">
+        <Botao icone={<ArrowRight className="size-4" />} onClick={() => irParaCentral("/s/rh")}>Entrar pelo Central</Botao>
+        <p className="text-center text-xs text-texto-suave" aria-live="polite">Redirecionando em {segundos} {segundos === 1 ? "segundo" : "segundos"}…</p>
+      </div>
     </Moldura>
   );
 }
 
-/* ---------------- Recuperar senha ---------------- */
+/* ---------------- Recuperar senha: feito no Central ---------------- */
 export function RecuperarSenha() {
-  const [email, setEmail] = useState("");
-  const [enviado, setEnviado] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-
-  async function enviar(e: FormEvent) {
-    e.preventDefault();
-    setEnviando(true);
-    await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/definir-senha` });
-    setEnviando(false);
-    setEnviado(true); // sempre a mesma resposta, exista ou não o e-mail
-  }
-
-  return (
-    <Moldura titulo="Recuperar senha" subtitulo="Enviaremos um link para você criar uma nova senha.">
-      {enviado ? (
-        <div className="flex flex-col gap-4">
-          <Aviso tom="sucesso">Se este e-mail estiver cadastrado, você vai receber o link em alguns minutos. Confira também o spam.</Aviso>
-          <Link to="/login" className="text-center text-sm text-primaria hover:underline">Voltar para o login</Link>
-        </div>
-      ) : (
-        <form onSubmit={enviar} className="flex flex-col gap-4">
-          <Campo rotulo="E-mail" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} obrigatorio />
-          <Botao type="submit" carregando={enviando} disabled={!email}>Enviar link</Botao>
-          <Link to="/login" className="text-center text-sm text-primaria hover:underline">Voltar para o login</Link>
-        </form>
-      )}
-    </Moldura>
-  );
+  useEffect(() => { irParaCentral("/recuperar-senha"); }, []);
+  return <Carregando />;
 }
 
 /* ---------------- Definir senha (convite ou recuperação) ---------------- */
@@ -105,7 +85,7 @@ export function DefinirSenha() {
       <Moldura titulo="Link inválido ou expirado">
         <div className="flex flex-col gap-4">
           <Aviso tom="alerta">Peça um novo link em “Esqueci minha senha” ou solicite um novo convite ao RH.</Aviso>
-          <Link to="/recuperar-senha" className="text-center text-sm text-primaria hover:underline">Pedir novo link</Link>
+          <a href={`${CENTRAL}/recuperar-senha`} className="text-center text-sm text-primaria hover:underline">Pedir novo link</a>
         </div>
       </Moldura>
     );
@@ -122,7 +102,7 @@ export function DefinirSenha() {
     const { error } = await supabase.auth.updateUser({ password: senha });
     setEnviando(false);
     if (error) return setErro(mensagemErro(error));
-    navegar("/", { replace: true });
+    if (embutidoNoCentral) navegar("/", { replace: true }); else irParaCentral("/s/rh");
   }
 
   return (

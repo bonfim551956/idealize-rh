@@ -2,6 +2,7 @@
 // O Central e o RH usam o mesmo login (este projeto). Dentro do Central, o RH não guarda sessão própria:
 // recebe do Central só o token de acesso (nunca o de renovação) e, quando o Central renova, recebe o novo.
 // Fora do Central, nada muda.
+export const CENTRAL = "https://central.oticasidealize.online";
 export const ORIGENS_CENTRAL = ["https://central.oticasidealize.online", "https://central-idealize.vercel.app"];
 
 export const embutidoNoCentral = (() => {

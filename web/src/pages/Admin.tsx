@@ -1,10 +1,11 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MailPlus, Pencil, Plus, Send, ShieldCheck, ShieldOff, UserCog, X } from "lucide-react";
-import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
+import { ExternalLink, Pencil, Plus, ShieldCheck, ShieldOff, UserCog, X } from "lucide-react";
+import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useEmpresas, useLojas, type Loja } from "../lib/dados";
 import { dataHora, so_digitos } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
+import { CENTRAL, embutidoNoCentral } from "../lib/central";
 import { AreaTexto, Aviso, Botao, CabecalhoPagina, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, useAvisos } from "../ui/componentes";
 
 /* =====================================================================
@@ -144,7 +145,6 @@ type Perfil = { id: string; codigo: string; nome: string; descricao: string | nu
 export function Acessos() {
   const { sessao } = useAuth();
   const lojas = useLojas();
-  const [convite, setConvite] = useState(false);
   const [concedendo, setConcedendo] = useState<Usuario | null>(null);
   const [revogando, setRevogando] = useState<{ a: Atribuicao; u: Usuario } | null>(null);
 
@@ -174,7 +174,10 @@ export function Acessos() {
   return (
     <>
       <CabecalhoPagina titulo="Usuários e acessos" descricao="Quem entra no sistema e o que pode ver. Toda concessão e revogação fica na auditoria."
-        acoes={<Botao icone={<MailPlus className="size-4" />} onClick={() => setConvite(true)}>Convidar usuário</Botao>} />
+        acoes={<a href={`${CENTRAL}/acessos`} target={embutidoNoCentral ? "_top" : "_blank"} rel="noopener noreferrer"
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primaria px-4 text-sm font-medium text-superficie hover:bg-primaria-escura">
+          <ExternalLink className="size-4" aria-hidden />Convidar pelo Central</a>} />
+      <Aviso tom="info">Novos usuários, senhas e verificação em duas etapas agora são feitos no Central Idealize (Gestão de acessos). Os perfis do RH podem ser dados aqui ou no Central.</Aviso>
       <Cartao>
         {q.isLoading ? <Carregando /> : q.error ? <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} /> : (
           <Tabela cabecalho={["Usuário", "Perfis e escopo", ""]}>
@@ -208,51 +211,18 @@ export function Acessos() {
         )}
         <p className="mt-3 text-xs text-texto-suave">Ninguém concede acesso a si mesmo. Para bloquear alguém (ex.: desligamento), revogue todos os perfis.</p>
       </Cartao>
-      <Convidar aberto={convite} fechar={() => setConvite(false)} />
       {concedendo && q.data && <Conceder usuario={concedendo} perfis={q.data.perfis} fechar={() => setConcedendo(null)} />}
       {revogando && <Revogar {...revogando} fechar={() => setRevogando(null)} />}
     </>
   );
 }
 
-function ConvitePendente({ u, desde }: { u: Usuario; desde: string }) {
-  const qc = useQueryClient();
-  const avisar = useAvisos();
-  const m = useMutation({
-    mutationFn: () => chamarFuncao("usuarios-convidar", JSON.stringify({ reenviar: true, usuario_id: u.id })),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", `Convite reenviado para ${u.email}.`); },
-    onError: (e) => avisar("erro", mensagemErro(e)),
-  });
+function ConvitePendente({ desde }: { u: Usuario; desde: string }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
       <Selo tom="alerta">Convite pendente · enviado em {dataHora(desde)}</Selo>
-      <Botao tamanho="sm" variante="secundaria" icone={<Send className="size-4" />} carregando={m.isPending} onClick={() => m.mutate()}>
-        Reenviar convite
-      </Botao>
+      <span className="text-xs text-texto-suave">Reenvie pelo Central</span>
     </div>
-  );
-}
-
-function Convidar({ aberto, fechar }: { aberto: boolean; fechar: () => void }) {
-  const qc = useQueryClient();
-  const avisar = useAvisos();
-  const [f, setF] = useState({ nome: "", email: "" });
-  const m = useMutation({
-    mutationFn: () => chamarFuncao("usuarios-convidar", JSON.stringify(f)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", `Convite enviado para ${f.email}.`); setF({ nome: "", email: "" }); fechar(); },
-    onError: (e) => avisar("erro", mensagemErro(e)),
-  });
-  return (
-    <Modal aberto={aberto} aoFechar={fechar} titulo="Convidar usuário" descricao="A pessoa recebe um e-mail para criar a senha e entra sem nenhum acesso. Depois você concede o perfil.">
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="flex flex-col gap-4">
-        <Campo rotulo="Nome" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} obrigatorio />
-        <Campo rotulo="E-mail" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} obrigatorio />
-        <div className="flex justify-end gap-2">
-          <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
-          <Botao type="submit" carregando={m.isPending} disabled={f.nome.trim().length < 2 || !f.email.includes("@")}>Enviar convite</Botao>
-        </div>
-      </form>
-    </Modal>
   );
 }
 
