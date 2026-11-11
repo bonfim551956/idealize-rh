@@ -89,10 +89,35 @@ async function entrar(page) {
 
   // ou cai direto no portal, ou pede o código
   const campoCodigo = page.locator('input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]').first();
-  const resultado = await Promise.race([
+  const canal = page.locator('input[type="radio"][name="canal_mfa"]').first();
+  const esperar = () => Promise.race([
     page.waitForURL(/superportal-empregador\.vr\.com\.br/, { timeout: 90_000 }).then(() => "portal"),
     campoCodigo.waitFor({ timeout: 90_000 }).then(() => "codigo"),
+    canal.waitFor({ timeout: 90_000 }).then(() => "canal"),
   ]).catch(() => "nada");
+  let resultado = await esperar();
+  if (resultado === "canal") {
+    // a VR pergunta por onde mandar o código: escolhe E-MAIL e clica em Enviar
+    log("VR pediu o canal do código; escolhendo e-mail");
+    const radios = page.locator('input[type="radio"][name="canal_mfa"]');
+    let marcado = false;
+    for (let i = 0; i < await radios.count(); i++) {
+      const r = radios.nth(i);
+      const rot = `${await r.getAttribute("value") ?? ""} ${await r.evaluate((e) => (e.closest("label")?.innerText || e.parentElement?.innerText || ""))}`;
+      if (/e-?mail/i.test(rot)) { await r.check({ force: true }); marcado = true; break; }
+    }
+    if (!marcado) {
+      const rotulo = page.getByText(/e-?mail/i).first();
+      await rotulo.click({ force: true, timeout: 5000 }).catch(() => { throw new Erro("Não achei a opção E-MAIL na tela de canal do código"); });
+    }
+    await canal.page().waitForTimeout(500);
+    const envio = page.getByRole("button", { name: /enviar/i }).first();
+    await envio.click({ force: true, timeout: 10_000 }).catch(async () => { await page.keyboard.press("Enter"); });
+    resultado = await Promise.race([
+      page.waitForURL(/superportal-empregador\.vr\.com\.br/, { timeout: 90_000 }).then(() => "portal"),
+      campoCodigo.waitFor({ timeout: 90_000 }).then(() => "codigo"),
+    ]).catch(() => "nada");
+  }
   if (resultado === "nada") {
     // retrato da tela (sem valores digitados) para entender onde parou
     const tela = await page.evaluate(() => {
