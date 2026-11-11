@@ -362,7 +362,7 @@ function CartaoItem({ item: i, fixo, colaboradores, problema, aoMudar, aoRemover
 }
 
 /* ---------------- Busca de colaborador ---------------- */
-function BuscaColaborador({ valor, lista, aoEscolher }: { valor: Colab | null; lista: Colab[]; aoEscolher: (c: Colab | null) => void }) {
+export function BuscaColaborador({ valor, lista, aoEscolher }: { valor: Colab | null; lista: Colab[]; aoEscolher: (c: Colab | null) => void }) {
   const [texto, setTexto] = useState("");
   const [aberto, setAberto] = useState(false);
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");

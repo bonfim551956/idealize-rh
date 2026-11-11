@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, FileSignature, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
 import { GerarTermo } from "./Termos";
+import { AdvertenciasColaborador } from "./Advertencias";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useLojas, type ColaboradorLinha } from "../lib/dados";
 import { SIGILO, STATUS_VINCULO, data, dataHora, hoje, mascaraTelefone, moeda, so_digitos } from "../lib/formato";
@@ -44,6 +45,7 @@ export function Ficha() {
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
     { valor: "uniformes", rotulo: "Uniformes", visivel: pode("uniforme.ler", loja), conteudo: <UniformesColaborador c={c} /> },
     { valor: "equipamentos", rotulo: "Equipamentos", visivel: pode("equipamento.ler", loja), conteudo: <EquipamentosColaborador c={c} /> },
+    { valor: "advertencias", rotulo: "Advertências", visivel: pode("documento.disciplinar.ler", loja), conteudo: <AdvertenciasColaborador c={c} /> },
     { valor: "timeline", rotulo: "Linha do tempo", visivel: true, conteudo: <LinhaDoTempo c={c} /> },
   ];
   const visiveis = abas.filter((a) => a.visivel);
