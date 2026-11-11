@@ -8,7 +8,7 @@ import { Painel } from "./pages/Painel";
 import { Colaboradores, NovoColaborador } from "./pages/Colaboradores";
 import { Ficha } from "./pages/Ficha";
 import { PaginaDocumentos } from "./pages/Documentos";
-import { Acessos, Auditoria, Conta, Lojas } from "./pages/Admin";
+import { Acessos, Auditoria, Conta, Lojas, Perfis } from "./pages/Admin";
 import { Manual } from "./pages/Manual";
 import { Uniformes } from "./pages/Uniformes";
 import { ValeTransporte } from "./pages/ValeTransporte";
@@ -60,6 +60,7 @@ export function App() {
         <Route path="vale-transporte" element={<Requer perm={(p) => p("vt.ler") || p("ausencia.ler")}><ValeTransporte /></Requer>} />
         <Route path="lojas" element={<Requer perm="config.estrutura.gerir"><Lojas /></Requer>} />
         <Route path="acessos" element={<Requer perm="acesso.gerir"><Acessos /></Requer>} />
+        <Route path="perfis" element={<Requer perm="acesso.gerir"><Perfis /></Requer>} />
         <Route path="auditoria" element={<Requer perm="auditoria.ler"><Auditoria /></Requer>} />
         <Route path="conta" element={<Conta />} />
         <Route path="manual" element={<Manual />} />
