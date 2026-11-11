@@ -287,7 +287,7 @@ async function principal() {
     log(`enviado ao RH 360: ${r.linhas} linhas, ${r.pessoas} pessoas`);
   } catch (e) {
     const msg = e instanceof Erro ? e.message : `Erro inesperado depois de "${etapa}": ${String(e?.message || e).split("\n")[0].slice(0, 200)}`;
-    log(`FALHOU: ${msg}`);
+    log("FALHOU — o motivo fica registrado no RH 360 (tela Banco de horas)");
     await enviar({ status: "erro", mensagem: msg, ...periodo }, []).catch(() => log("também não consegui avisar o RH 360"));
     process.exitCode = 1;
   } finally {
