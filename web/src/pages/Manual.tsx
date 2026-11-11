@@ -591,6 +591,20 @@ const SECOES: Secao[] = [
       </>
     ),
   },
+  /* ---------------- Termos ---------------- */
+  {
+    id: "termos", titulo: "Gerar termos (uniforme, EPI, equipamento, imagem)", icone: ClipboardList, grupo: "Pessoas",
+    palavras: "termo gerar imprimir assinatura uniforme epi ca equipamento notebook celular uso de imagem voz responsabilidade recebimento",
+    mostrar: (c) => c.pode("colaborador.ler"),
+    conteudo: () => (
+      <>
+        <P>Na ficha, em <B>Ações</B>, clique em <Menu>Gerar termo</Menu> e escolha: recebimento de uniforme, entrega e responsabilidade de EPI, recebimento de equipamento ou autorização de uso de imagem e voz. Também dá para gerar direto pelos itens da seção <Menu>Admissão</Menu>.</P>
+        <P>Nome, CPF, cargo, loja, admissão, RG, endereço e empresa vêm da ficha. Antes de imprimir, confira o que não é pessoal: tipo de entrega e peças do uniforme, nº do CA e validade do EPI, patrimônio, acessórios e estado dos equipamentos. Dá para acrescentar ou tirar linhas.</P>
+        <P>Clique em <Menu>Gerar e imprimir</Menu>: o termo abre no modelo oficial, pronto para imprimir ou salvar em PDF. Depois de assinado, anexe em Documentos (ou no item da admissão).</P>
+        <Dica>Quem não vê dados pessoais gera o termo com CPF, RG e endereço em branco, para preencher à mão.</Dica>
+      </>
+    ),
+  },
   /* ---------------- Banco de horas ---------------- */
   {
     id: "banco-horas", titulo: "Banco de horas (VR)", icone: Palmtree, grupo: "VT e ausências",
