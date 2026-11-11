@@ -40,10 +40,13 @@ async function codigoDoGmail(desde) {
           const de = (m.envelope?.from || []).map((f) => `${f.address}`).join(" ").toLowerCase();
           const assunto = (m.envelope?.subject || "").toLowerCase();
           if (!/vr\.com\.br|vr benef|auth0|vr\b/.test(de + " " + assunto)) continue;
-          const corpo = m.source.toString("utf8")
-            .replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
-            .replace(/<[^>]+>/g, " ");
-          const achou = (assunto.match(/\b(\d{6})\b/) || corpo.match(/(?:c[óo]digo|code)[^0-9]{0,80}(\d{6})\b/i) || corpo.match(/\b(\d{6})\b/));
+          const bruto = m.source.toString("utf8")
+            .replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+          const corpo = bruto.replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<script[\s\S]*?<\/script>/gi, " ")
+            .replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
+          const achou = assunto.match(/\b(\d{6})\b/)
+            || corpo.match(/(?:c[óo]digo|code|token)[^0-9#]{0,120}\b(\d{6})\b/i)
+            || corpo.match(/(?<![#\d])\b(\d{6})\b(?![\d])/);
           if (achou) return achou[1];
         }
       } finally { lock.release(); }
@@ -51,6 +54,21 @@ async function codigoDoGmail(desde) {
     }
   } finally { await imap.logout().catch(() => {}); }
   throw new Erro("O código de acesso da VR não chegou no Gmail em 4 minutos");
+}
+
+/* retrato da tela (sem valores digitados) para entender onde parou */
+async function telaAtual(page) {
+  const tela = await page.evaluate(() => {
+    const vis = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
+    const txt = (sel) => [...document.querySelectorAll(sel)].filter(vis).map((e) => e.innerText.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 8);
+    return {
+      url: location.host + location.pathname, titulo: document.title,
+      textos: txt("h1,h2,h3,label,p,span[class*=error],[role=alert],.ulp-input-error-message,[id*=error]"),
+      campos: [...document.querySelectorAll("input")].filter(vis).map((i) => `${i.type}:${i.name || i.id}`).slice(0, 8),
+      botoes: txt("button,a[role=button]"),
+    };
+  }).catch(() => null);
+  return JSON.stringify(tela).slice(0, 700);
 }
 
 /* ---------------- Login no SuperPortal ---------------- */
@@ -118,20 +136,7 @@ async function entrar(page) {
       campoCodigo.waitFor({ timeout: 90_000 }).then(() => "codigo"),
     ]).catch(() => "nada");
   }
-  if (resultado === "nada") {
-    // retrato da tela (sem valores digitados) para entender onde parou
-    const tela = await page.evaluate(() => {
-      const vis = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
-      const txt = (sel) => [...document.querySelectorAll(sel)].filter(vis).map((e) => e.innerText.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 6);
-      return {
-        url: location.host + location.pathname, titulo: document.title,
-        textos: txt("h1,h2,h3,label,p,[role=alert],.ulp-input-error-message,[id*=error]"),
-        campos: [...document.querySelectorAll("input")].filter(vis).map((i) => `${i.type}:${i.name || i.id}`).slice(0, 8),
-        botoes: txt("button,a[role=button]"),
-      };
-    }).catch(() => null);
-    throw new Erro(`Login não avançou. Tela: ${JSON.stringify(tela).slice(0, 700)}`);
-  }
+  if (resultado === "nada") throw new Erro(`Login não avançou. Tela: ${await telaAtual(page)}`);
   if (resultado === "codigo") {
     log("VR pediu código; lendo o Gmail");
     const codigo = await codigoDoGmail(antes);
@@ -140,9 +145,20 @@ async function entrar(page) {
     await campoCodigo.fill(codigo);
     const lembrar = page.locator('input[type="checkbox"][name*="remember" i]');
     if (await lembrar.isVisible().catch(() => false)) await lembrar.check().catch(() => {});
-    await campoCodigo.press("Enter");
-    await page.waitForURL(/superportal-empregador\.vr\.com\.br/, { timeout: 90_000 })
-      .catch(() => { throw new Erro("O código foi digitado, mas o portal não abriu"); });
+    const botao = page.getByRole("button", { name: /continuar|validar|confirmar|enviar|entrar|verificar/i }).first();
+    if (await botao.isVisible().catch(() => false)) await botao.click({ force: true, timeout: 10_000 }).catch(() => campoCodigo.press("Enter"));
+    else await campoCodigo.press("Enter");
+    log("código enviado");
+    // pode aparecer "lembrar este dispositivo" ou outra confirmação
+    for (let i = 0; i < 3; i++) {
+      const ok = await page.waitForURL(/superportal-empregador\.vr\.com\.br/, { timeout: 30_000 }).then(() => true).catch(() => false);
+      if (ok) break;
+      const seguir = page.getByRole("button", { name: /continuar|lembrar|sim|confirmar|pular|agora n[ãa]o/i }).first();
+      if (await seguir.isVisible().catch(() => false)) { await seguir.click({ force: true }).catch(() => {}); continue; }
+      if (i === 2 || !(await seguir.isVisible().catch(() => false))) {
+        if (!/superportal-empregador/.test(page.url())) throw new Erro(`O código foi digitado, mas o portal não abriu. Tela: ${await telaAtual(page)}`);
+      }
+    }
   }
   log("logado no SuperPortal");
 }
