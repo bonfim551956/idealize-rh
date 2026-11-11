@@ -605,6 +605,20 @@ const SECOES: Secao[] = [
       </>
     ),
   },
+  /* ---------------- Advertências ---------------- */
+  {
+    id: "advertencias", titulo: "Advertências e suspensões", icone: ClipboardList, grupo: "Pessoas",
+    palavras: "advertência advertencia suspensão disciplinar motivo atraso falta termo assinatura recusa testemunhas reincidência",
+    mostrar: (c) => c.pode("documento.disciplinar.ler"),
+    conteudo: () => (
+      <>
+        <P>Em <Menu>Advertências</Menu> (ou na aba Advertências da ficha) clique em <Menu>Nova advertência</Menu>: escolha o colaborador, o tipo (verbal, escrita ou suspensão com os dias — no máximo 30), as datas, o motivo e descreva o fato. Se a pessoa já tiver registros nos últimos 90 dias, o sistema mostra o histórico.</P>
+        <P>Ao registrar, o termo sai pronto para imprimir. Depois de assinado, clique em <Menu>Anexar</Menu>; se o colaborador se recusar a assinar, marque a opção de recusa e anexe o termo assinado pelas testemunhas.</P>
+        <P>A lista de motivos é editada no botão <Menu>Motivos</Menu>. Registro lançado errado é <B>cancelado com motivo</B>, não apagado.</P>
+        <Dica>Sigiloso: só quem tem acesso a documentos disciplinares vê. Advertência sem termo assinado há mais de 3 dias aparece nas Pendências do Painel.</Dica>
+      </>
+    ),
+  },
   /* ---------------- Banco de horas ---------------- */
   {
     id: "banco-horas", titulo: "Banco de horas (VR)", icone: Palmtree, grupo: "VT e ausências",
@@ -652,7 +666,7 @@ const SECOES: Secao[] = [
           <T>Cadastro do VT</T>
           <P>Em <Menu>Cadastro do VT</Menu>, informe para cada colaborador se recebe VT e o <B>valor diário</B> (ida e volta). Quem não recebe (ex.: home office) fica marcado como “Não”.</P>
         </>}
-        <Atencao>Em atestados, afastamentos e licenças, <B>não escreva diagnóstico nem CID</B>. O documento vai em Documentos (categoria Atestados médicos ou Afastamentos e licenças). Ausência lançada errado é <B>cancelada com motivo</B>, não apagada.</Atencao>
+        <Atencao>Em atestados, afastamentos e licenças, <B>não escreva diagnóstico nem CID</B>. O documento vai em Documentos (categoria Atestados médicos ou Afastamentos e licenças). Ao enviar um <B>atestado</B> com os dias de afastamento, a ausência já é lançada sozinha (e descontada do VT do mês seguinte); a <B>declaração de horas</B> também é lançada, sem desconto. Ausência lançada errado é <B>cancelada com motivo</B>, não apagada.</Atencao>
         <P>O desconto de até 6% do salário não é calculado aqui: fica com a folha.</P>
       </>
     ),
