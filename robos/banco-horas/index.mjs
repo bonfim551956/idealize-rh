@@ -168,14 +168,15 @@ async function entrar(page) {
 async function escolherEmpresa(page) {
   const alvo = process.env.VR_CNPJ || "58.849.594/0001-90";
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
-  const cabecalho = await page.locator("header").first().innerText().catch(() => "");
-  if (cabecalho.includes(alvo)) { log("empresa certa já selecionada"); return; }
+  const topo = await page.locator("body").innerText().catch(() => "");
+  if (topo.slice(0, 600).includes(alvo)) { log("empresa certa já selecionada"); return; }
   log("trocando de empresa no portal");
-  await page.getByText(/^Trocar$/).first().click({ force: true, timeout: 20_000 })
+  await page.locator("span", { hasText: /^Trocar$/ }).first().locator("xpath=..").click({ force: true, timeout: 20_000 })
     .catch(() => { throw new Erro("Não achei o botão Trocar empresa no portal"); });
-  const opcao = page.locator(`[aria-label*="${alvo}"], label:has-text("${alvo}")`).first();
-  await opcao.waitFor({ timeout: 20_000 }).catch(() => { throw new Erro(`O CNPJ ${alvo} não aparece na lista de empresas da VR`); });
-  await opcao.click({ force: true });
+  const digitos = alvo.replace(/\D/g, "");
+  const opcao = page.locator(`input[type="radio"][value="${digitos}"]`).first();
+  await opcao.waitFor({ state: "attached", timeout: 20_000 }).catch(() => { throw new Erro(`O CNPJ ${alvo} não aparece na lista de empresas da VR`); });
+  await opcao.check({ force: true }).catch(() => opcao.click({ force: true }));
   await page.getByRole("button", { name: /acessar empresa/i }).first().click({ force: true, timeout: 20_000 })
     .catch(() => { throw new Erro("Não consegui confirmar a troca de empresa"); });
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
