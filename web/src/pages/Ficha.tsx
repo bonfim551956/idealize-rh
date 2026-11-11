@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BadgeCheck, BadgeDollarSign, Eye, EyeOff, FileSignature, Pencil, TrendingUp, UserMinus, Workflow } from "lucide-react";
+import { GerarTermo } from "./Termos";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useLojas, type ColaboradorLinha } from "../lib/dados";
 import { SIGILO, STATUS_VINCULO, data, dataHora, hoje, mascaraTelefone, moeda, so_digitos } from "../lib/formato";
@@ -87,7 +88,7 @@ export function Ficha() {
 function VisaoGeral({ c }: { c: ColaboradorLinha }) {
   const { pode } = useAuth();
   const loja = c.loja_atual_id;
-  const [acao, setAcao] = useState<"transferir" | "status" | "cargo" | "salario" | "desligar" | "concluir" | "editar" | "efetivar" | null>(null);
+  const [acao, setAcao] = useState<"transferir" | "status" | "cargo" | "salario" | "desligar" | "concluir" | "editar" | "efetivar" | "termo" | null>(null);
   const encerrado = c.status === "desligado" || c.status === "arquivado";
 
   const desligamento = useQuery({
@@ -105,6 +106,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
     { k: "transferir" as const, rotulo: "Transferir de loja", icone: ArrowRightLeft, ok: pode("colaborador.transferir", loja) && !encerrado },
     { k: "cargo" as const, rotulo: "Promoção / mudança de função", icone: TrendingUp, ok: pode("cargo.alterar", loja) && !encerrado },
     { k: "salario" as const, rotulo: "Alteração salarial", icone: BadgeDollarSign, ok: pode("remuneracao.gerir", loja) && !encerrado },
+    { k: "termo" as const, rotulo: "Gerar termo (uniforme, EPI, equipamento, imagem)", icone: FileSignature, ok: pode("colaborador.ler", loja) },
     { k: "desligar" as const, rotulo: "Iniciar desligamento", icone: UserMinus, ok: pode("desligamento.gerir", loja) && c.status !== "em_desligamento" && !encerrado && c.status !== "pre_admissao" && c.status !== "em_admissao" },
   ].filter((b) => b.ok);
 
@@ -144,6 +146,7 @@ function VisaoGeral({ c }: { c: ColaboradorLinha }) {
       {acao === "transferir" && <Transferir c={c} fechar={() => setAcao(null)} />}
       {acao === "cargo" && <MudarCargo c={c} fechar={() => setAcao(null)} />}
       {acao === "salario" && <MudarSalario c={c} fechar={() => setAcao(null)} />}
+      {acao === "termo" && <GerarTermo c={c} fechar={() => setAcao(null)} />}
       {acao === "desligar" && <IniciarDesligamento c={c} fechar={() => setAcao(null)} />}
       {acao === "concluir" && desligamento.data && <ConcluirDesligamento c={c} id={desligamento.data.id} ultimoDia={desligamento.data.ultimo_dia} fechar={() => setAcao(null)} />}
     </div>
