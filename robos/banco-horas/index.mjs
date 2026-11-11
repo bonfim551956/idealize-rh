@@ -171,7 +171,7 @@ async function escolherEmpresa(page) {
   const topo = await page.locator("body").innerText().catch(() => "");
   if (topo.slice(0, 600).includes(alvo)) { log("empresa certa já selecionada"); return; }
   log("trocando de empresa no portal");
-  await page.locator("span", { hasText: /^Trocar$/ }).first().locator("xpath=..").click({ force: true, timeout: 20_000 })
+  await page.getByText("Trocar", { exact: true }).filter({ visible: true }).first().click({ timeout: 20_000 })
     .catch(() => { throw new Erro("Não achei o botão Trocar empresa no portal"); });
   const digitos = alvo.replace(/\D/g, "");
   const opcao = page.locator(`input[type="radio"][value="${digitos}"]`).first();
@@ -179,9 +179,13 @@ async function escolherEmpresa(page) {
   // o botão de rádio é escondido (estilizado); clica pelo próprio elemento na página
   await opcao.evaluate((el) => { el.click(); (el.closest("label") || el.parentElement)?.click(); });
   if (!(await opcao.isChecked().catch(() => false))) await opcao.evaluate((el) => el.click());
-  await page.getByRole("button", { name: /acessar empresa/i }).first().click({ force: true, timeout: 20_000 })
-    .catch(() => { throw new Erro("Não consegui confirmar a troca de empresa"); });
+  const acessar = page.locator('button[title="Acessar empresa"], button:has-text("Acessar empresa")').first();
+  await acessar.waitFor({ state: "attached", timeout: 20_000 }).catch(() => { throw new Erro("Não achei o botão Acessar empresa"); });
+  await acessar.evaluate((el) => el.click());
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  const agora = await page.locator("body").innerText().catch(() => "");
+  if (!agora.slice(0, 800).includes(alvo)) log("aviso: não confirmei a empresa no topo da página");
   log("empresa trocada");
 }
 
