@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, Sparkles, Trash2, XCircle } from "lucide-react";
 import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCategorias, type ColaboradorLinha, type DocumentoLinha } from "../lib/dados";
 import { useAuth } from "../auth/AuthProvider";
+import { data as dataBR } from "../lib/formato";
 import { AreaTexto, Aviso, Botao, Campo, Modal, Selecao, Selo, cx, useAvisos } from "../ui/componentes";
 
 const TIPOS_ACEITOS = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
@@ -13,8 +14,10 @@ const LEITURAS_SIMULTANEAS = 3;
 
 type Colab = Pick<ColaboradorLinha, "id" | "nome_completo" | "loja_atual_id" | "loja_nome">;
 type Meta = { categoria_id: string; nome: string; data_emissao: string; competencia: string; vencimento: string; colaborador: Colab | null;
-  horario_inicio?: string; horario_fim?: string; cid?: string };
+  horario_inicio?: string; horario_fim?: string; cid?: string;
+  afast_inicio?: string; afast_dias?: string; lancar_ausencia?: boolean };
 const COM_HORARIO_CID = ["atestados_medicos", "declaracao_comparecimento"];
+const somaDiasISO = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 type Estado = "lendo" | "pronto" | "manual" | "enviando" | "enviado" | "falhou";
 type Item = {
   id: string; arquivo: File; estado: Estado; meta: Meta;
@@ -23,7 +26,7 @@ type Item = {
 };
 type RespostaIA = {
   sugestao: { categoria_id: string; nome: string; data_emissao: string | null; competencia: string | null; vencimento: string | null; confianca: string; justificativa: string | null;
-    horario_inicio?: string | null; horario_fim?: string | null; cid?: string | null };
+    horario_inicio?: string | null; horario_fim?: string | null; cid?: string | null; dias_afastamento?: number | null; afastamento_inicio?: string | null };
   pessoa: { nome: string | null; cpf_mascarado: string | null };
   colaborador: Colab | null;
   multiplos: boolean;
@@ -136,6 +139,9 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
                 horario_inicio: r.sugestao.horario_inicio ?? "",
                 horario_fim: r.sugestao.horario_fim ?? "",
                 cid: r.sugestao.cid ?? "",
+                afast_inicio: r.sugestao.afastamento_inicio ?? r.sugestao.data_emissao ?? "",
+                afast_dias: r.sugestao.dias_afastamento ? String(r.sugestao.dias_afastamento) : "",
+                lancar_ausencia: true,
                 colaborador: fixo ?? r.colaborador ?? i.meta.colaborador,
               },
               ia: {
@@ -179,7 +185,9 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
 
   /* ---------- validação e envio ---------- */
   const { pode } = useAuth();
+  const qc = useQueryClient();
   const catDe = (id: string) => categorias.data?.find((c) => c.id === id);
+  const podeAusencia = (i: Item) => !!i.meta.colaborador && pode("ausencia.registrar", i.meta.colaborador.loja_atual_id);
   function problema(i: Item): string | null {
     const c = catDe(i.meta.categoria_id);
     if (!i.meta.colaborador) return "Escolha o colaborador";
@@ -190,6 +198,11 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
     if (COM_HORARIO_CID.includes(c.codigo)) {
       if (i.meta.horario_inicio && i.meta.horario_fim && i.meta.horario_fim <= i.meta.horario_inicio) return "O horário final deve ser depois do inicial";
       if (i.meta.cid && !/^[A-Z]\d{2}(\.?\d{1,2})?$/.test(i.meta.cid.trim().toUpperCase())) return "CID inválido (ex.: Z00.0)";
+      if (i.meta.lancar_ausencia !== false && podeAusencia(i)) {
+        if (c.codigo === "atestados_medicos" && (!(i.meta.afast_inicio || i.meta.data_emissao) || !(Number(i.meta.afast_dias) >= 1)))
+          return "Informe o início e os dias de afastamento do atestado (ou desmarque “lançar ausência”)";
+        if (c.codigo === "declaracao_comparecimento" && !i.meta.data_emissao) return "Informe a data da declaração (emissão)";
+      }
     }
     return null;
   }
@@ -199,7 +212,7 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
 
   async function enviarTodos() {
     setEnviando(true);
-    let ok = 0;
+    let ok = 0, ausencias = 0;
     for (const i of pendentes) {
       if (problema(i)) continue;
       atualizar(i.id, (x) => ({ ...x, estado: "enviando", erro: undefined }));
@@ -215,15 +228,33 @@ function EnvioInteligente({ colaborador, aoFechar, aoConcluir }: { colaborador?:
             cid: i.meta.cid?.trim().toUpperCase() || null,
           } : {}),
         }));
-        await chamarFuncao("documentos-upload", fd, false);
-        atualizar(i.id, (x) => ({ ...x, estado: "enviado" }));
+        const env = await chamarFuncao<{ documento_id: string }>("documentos-upload", fd, false);
+        const cod = catDe(i.meta.categoria_id)?.codigo;
+        let aviso: string | undefined;
+        if (env?.documento_id && i.meta.lancar_ausencia !== false && (cod === "atestados_medicos" || cod === "declaracao_comparecimento")) {
+          if (!podeAusencia(i)) aviso = "Ausência não lançada: seu perfil não registra ausências (o DP lança em VT e ausências).";
+          else {
+            const ini = cod === "atestados_medicos" ? (i.meta.afast_inicio || i.meta.data_emissao) : i.meta.data_emissao;
+            const fim = cod === "atestados_medicos" ? somaDiasISO(ini!, Number(i.meta.afast_dias) - 1) : ini;
+            const horario = i.meta.horario_inicio && i.meta.horario_fim ? `${i.meta.horario_inicio} ÀS ${i.meta.horario_fim}` : null;
+            const { error } = await supabase.rpc("ausencia_registrar", { p: {
+              colaborador_id: i.meta.colaborador!.id, tipo: cod === "atestados_medicos" ? "atestado" : "declaracao_horas",
+              data_inicio: ini, data_fim: fim, horario: cod === "declaracao_comparecimento" ? horario : null,
+              documento_id: env.documento_id, observacao: "LANÇADO AO ENVIAR O DOCUMENTO" } });
+            aviso = error ? `Documento enviado, mas a ausência não foi lançada: ${mensagemErro(error)}` : undefined;
+            if (!error) ausencias++;
+          }
+        }
+        atualizar(i.id, (x) => ({ ...x, estado: "enviado", erro: aviso }));
         ok++;
       } catch (e) {
         atualizar(i.id, (x) => ({ ...x, estado: "falhou", erro: mensagemErro(e) }));
       }
     }
     setEnviando(false);
-    if (ok) avisar("sucesso", ok === 1 ? "1 documento enviado. Agora ele precisa ser conferido." : `${ok} documentos enviados. Agora eles precisam ser conferidos.`);
+    if (ok) avisar("sucesso", (ok === 1 ? "1 documento enviado. Agora ele precisa ser conferido." : `${ok} documentos enviados. Agora eles precisam ser conferidos.`)
+      + (ausencias ? ` ${ausencias === 1 ? "1 ausência lançada" : `${ausencias} ausências lançadas`} em VT e ausências.` : ""));
+    if (ausencias) { qc.invalidateQueries({ queryKey: ["vt"] }); qc.invalidateQueries({ queryKey: ["ausencias"] }); }
     if (ok && ok === pendentes.length) aoConcluir();
   }
 
@@ -307,6 +338,7 @@ function CartaoItem({ item: i, fixo, colaboradores, problema, aoMudar, aoRemover
             {i.estado === "lendo" && <span className="inline-flex items-center gap-1 text-xs text-texto-suave"><Loader2 className="size-3 animate-spin" /> Lendo o documento…</span>}
             {i.estado === "enviando" && <span className="inline-flex items-center gap-1 text-xs text-texto-suave"><Loader2 className="size-3 animate-spin" /> Enviando…</span>}
             {i.estado === "enviado" && <span className="inline-flex items-center gap-1 text-xs text-sucesso"><CheckCircle2 className="size-3" /> Enviado</span>}
+            {i.estado === "enviado" && i.erro && <span className="inline-flex items-center gap-1 text-xs text-alerta"><AlertTriangle className="size-3" /> {i.erro}</span>}
             {i.ia && i.estado !== "enviado" && <Selo tom={tomConf}><Sparkles className="mr-1 size-3" /> Sugestão IA · confiança {i.ia.confianca === "media" ? "média" : i.ia.confianca}</Selo>}
             {i.estado === "manual" && !i.ia && <Selo>Preenchimento manual</Selo>}
           </div>
@@ -348,6 +380,21 @@ function CartaoItem({ item: i, fixo, colaboradores, problema, aoMudar, aoRemover
                 <Campo rotulo="Horário — até" type="time" value={i.meta.horario_fim ?? ""} onChange={(e) => aoMudar({ horario_fim: e.target.value })} />
                 <Campo rotulo="CID" value={i.meta.cid ?? ""} onChange={(e) => aoMudar({ cid: e.target.value })} placeholder="Ex.: Z00.0" maxLength={10}
                   dica="Sigiloso: só DP e diretoria veem" />
+                {cat.codigo === "atestados_medicos" && (
+                  <>
+                    <Campo rotulo="Afastamento a partir de" type="date" value={i.meta.afast_inicio || i.meta.data_emissao} onChange={(e) => aoMudar({ afast_inicio: e.target.value })} />
+                    <Campo rotulo="Dias de afastamento" type="number" min={1} max={365} value={i.meta.afast_dias ?? ""} onChange={(e) => aoMudar({ afast_dias: e.target.value })} />
+                    <p className="self-end pb-2 text-xs text-texto-suave">
+                      {Number(i.meta.afast_dias) >= 1 && (i.meta.afast_inicio || i.meta.data_emissao) ? `Até ${dataBR(somaDiasISO(i.meta.afast_inicio || i.meta.data_emissao, Number(i.meta.afast_dias) - 1))}` : ""}
+                    </p>
+                  </>
+                )}
+                <label className="col-span-3 flex items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-1" checked={i.meta.lancar_ausencia !== false} onChange={(e) => aoMudar({ lancar_ausencia: e.target.checked })} />
+                  <span>{cat.codigo === "atestados_medicos"
+                    ? <>Lançar a ausência (atestado) em <b>VT e ausências</b> — os dias são descontados do VT do mês seguinte.</>
+                    : <>Lançar a declaração de horas em <b>VT e ausências</b> (na data de emissão, com o horário). Não desconta do VT.</>}</span>
+                </label>
               </div>
             )}
           </div>
