@@ -208,17 +208,17 @@ async function sessaoPontomais(page) {
   return h;
 }
 
-/* chamadas à API do Pontomais feitas de dentro da página (mesma origem/cookies do navegador) */
+/* chamadas à API do Pontomais com a mesma sessão do navegador (feitas pelo robô, sem as regras de CORS da página) */
 async function api(page, cab, metodo, caminho, corpo) {
-  return page.evaluate(async ({ url, metodo, cab, corpo }) => {
-    const r = await fetch(url, {
-      method: metodo,
-      headers: { ...cab, "Content-Type": "application/json", Accept: "application/json, text/plain, */*" },
-      body: corpo ? JSON.stringify(corpo) : undefined,
-    });
-    const t = await r.text();
-    return { status: r.status, texto: t };
-  }, { url: caminho.startsWith("http") ? caminho : `${API}${caminho}`, metodo, cab, corpo });
+  const url = caminho.startsWith("http") ? caminho : `${API}${caminho}`;
+  const r = await page.context().request.fetch(url, {
+    method: metodo,
+    headers: { ...cab, "Content-Type": "application/json", Accept: "application/json, text/plain, */*",
+      Origin: PORTAL, Referer: `${PORTAL}/` },
+    data: corpo ? JSON.stringify(corpo) : undefined,
+    timeout: 120_000,
+  });
+  return { status: r.status(), texto: await r.text() };
 }
 
 /* pede um relatório HTML ao Pontomais, espera ficar pronto e baixa */
