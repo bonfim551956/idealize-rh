@@ -176,7 +176,9 @@ async function escolherEmpresa(page) {
   const digitos = alvo.replace(/\D/g, "");
   const opcao = page.locator(`input[type="radio"][value="${digitos}"]`).first();
   await opcao.waitFor({ state: "attached", timeout: 20_000 }).catch(() => { throw new Erro(`O CNPJ ${alvo} não aparece na lista de empresas da VR`); });
-  await opcao.check({ force: true }).catch(() => opcao.click({ force: true }));
+  // o botão de rádio é escondido (estilizado); clica pelo próprio elemento na página
+  await opcao.evaluate((el) => { el.click(); (el.closest("label") || el.parentElement)?.click(); });
+  if (!(await opcao.isChecked().catch(() => false))) await opcao.evaluate((el) => el.click());
   await page.getByRole("button", { name: /acessar empresa/i }).first().click({ force: true, timeout: 20_000 })
     .catch(() => { throw new Erro("Não consegui confirmar a troca de empresa"); });
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
