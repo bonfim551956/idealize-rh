@@ -612,10 +612,10 @@ const SECOES: Secao[] = [
     mostrar: (c) => c.pode("documento.disciplinar.ler"),
     conteudo: () => (
       <>
-        <P>Em <Menu>Advertências</Menu> (ou na aba Advertências da ficha) clique em <Menu>Nova advertência</Menu>: escolha o colaborador, o tipo (verbal, escrita ou suspensão com os dias — no máximo 30), as datas, o motivo e descreva o fato. Se a pessoa já tiver registros nos últimos 90 dias, o sistema mostra o histórico.</P>
-        <P>Ao registrar, o termo sai pronto para imprimir. Depois de assinado, clique em <Menu>Anexar</Menu>; se o colaborador se recusar a assinar, marque a opção de recusa e anexe o termo assinado pelas testemunhas.</P>
+        <P>O sistema <B>não gera</B> a advertência: ela é feita e assinada como de costume, e aqui fica o controle. Em <Menu>Advertências</Menu> (ou na aba Advertências da ficha) clique em <Menu>Registrar advertência</Menu> e envie o PDF ou a foto do documento assinado.</P>
+        <P>O sistema lê o documento e preenche sozinho o colaborador, o tipo (verbal, escrita ou suspensão com os dias), as datas, o motivo, o que aconteceu, as testemunhas e se a pessoa assinou ou recusou. Confira, ajuste se precisar e clique em <Menu>Registrar e guardar</Menu>: o registro entra no controle e o arquivo fica guardado nos documentos do colaborador. Se a pessoa já tiver registros nos últimos 90 dias, o sistema mostra o histórico.</P>
         <P>A lista de motivos é editada no botão <Menu>Motivos</Menu>. Registro lançado errado é <B>cancelado com motivo</B>, não apagado.</P>
-        <Dica>Sigiloso: só quem tem acesso a documentos disciplinares vê. Advertência sem termo assinado há mais de 3 dias aparece nas Pendências do Painel.</Dica>
+        <Dica>Sigiloso: só quem tem acesso a documentos disciplinares vê. No ícone de olho da lista você abre o documento guardado.</Dica>
       </>
     ),
   },

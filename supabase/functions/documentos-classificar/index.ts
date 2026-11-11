@@ -77,6 +77,9 @@ Deno.serve(async (req) => {
   const codigos = categorias.map((c) => c.codigo);
 
   const hoje = new Date().toISOString().slice(0, 10);
+  // motivos de advertência cadastrados (só vem para quem pode ler documentos disciplinares)
+  const { data: motivosData } = await usuario.from("advertencia_motivos").select("nome").eq("ativo", true);
+  const motivosAdv = ((motivosData ?? []) as { nome: string }[]).map((m) => m.nome);
   const listaCategorias = categorias.map((c) => `- ${c.codigo}: ${c.nome}${c.dica_ia ? ` — ${c.dica_ia}` : ""}`).join("\n");
 
   const sistema = `Você classifica documentos de RH de uma rede de óticas no Brasil (Óticas Idealize).
@@ -92,6 +95,11 @@ ${listaCategorias}
 - Não inclua diagnóstico ou detalhe de saúde em nenhum campo. A ÚNICA exceção é o campo "cid": se o documento for atestado médico ou declaração de comparecimento e trouxer um código CID escrito (ex.: "Z00.0", "J11"), copie só o código nesse campo; nunca deduza um CID que não esteja escrito.
 - "horario_inicio" e "horario_fim": em atestados e declarações de comparecimento/horas, o horário de início e de fim escrito no documento (formato HH:MM, 24 horas). Se não houver, deixe vazio.
 - "dias_afastamento" e "afastamento_inicio": em atestado médico, quantos dias de afastamento/repouso o documento concede (número inteiro) e a partir de que data (AAAA-MM-DD). Se não estiver escrito, deixe vazio.
+- Campos "adv_*": preencha SOMENTE se o documento for advertência (verbal/escrita) ou suspensão disciplinar; nos demais, deixe vazios.
+  "adv_tipo": verbal, escrita ou suspensao. "adv_dias_suspensao": dias de suspensão (número). "adv_data_ocorrencia": data do fato (AAAA-MM-DD); "data_emissao" é a data em que a advertência foi aplicada/assinada.
+  "adv_motivo": ${motivosAdv.length ? `use exatamente um destes se couber: ${motivosAdv.join("; ")}. Se nenhum couber, ` : ""}um motivo curto (até 6 palavras).
+  "adv_relato": o que aconteceu segundo o documento, em 1 a 3 frases objetivas (datas, horários, regra descumprida), sem opinião.
+  "adv_testemunhas": nomes das testemunhas que assinam, separados por vírgula. "adv_assinatura": "colaborador" se o empregado assinou, "testemunhas" se consta recusa e assinaram testemunhas, "sem_assinatura" se não há assinatura.
 - Confiança: "alta" se o tipo do documento é inequívoco; "media" se há alguma dúvida; "baixa" se ilegível ou ambíguo.
 Hoje é ${hoje}.`;
 
@@ -112,6 +120,13 @@ Hoje é ${hoje}.`;
         cid: { type: "string", description: "Código CID escrito no documento, ou vazio" },
         dias_afastamento: { type: "string", description: "Dias de afastamento do atestado (número) ou vazio" },
         afastamento_inicio: { type: "string", description: "AAAA-MM-DD ou vazio" },
+        adv_tipo: { type: "string", enum: ["", "verbal", "escrita", "suspensao"] },
+        adv_dias_suspensao: { type: "string", description: "Dias de suspensão (número) ou vazio" },
+        adv_data_ocorrencia: { type: "string", description: "AAAA-MM-DD ou vazio" },
+        adv_motivo: { type: "string", description: "Motivo curto da advertência ou vazio" },
+        adv_relato: { type: "string", description: "O que aconteceu, 1 a 3 frases, ou vazio" },
+        adv_testemunhas: { type: "string", description: "Nomes das testemunhas ou vazio" },
+        adv_assinatura: { type: "string", enum: ["", "colaborador", "testemunhas", "sem_assinatura"] },
         pessoa_nome: { type: "string", description: "Nome do empregado ou vazio" },
         pessoa_cpf: { type: "string", description: "CPF do empregado (só dígitos) ou vazio" },
         justificativa: { type: "string", description: "Uma frase curta explicando a escolha, sem dados de saúde" },
@@ -131,7 +146,7 @@ Hoje é ${hoje}.`;
       headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: MODELO,
-        max_tokens: 1024,
+        max_tokens: 1536,
         system: sistema,
         tools: [ferramenta],
         // o modelo atual não aceita ferramenta forçada; o prompt exige a chamada e o servidor revalida tudo
@@ -210,6 +225,16 @@ Hoje é ${hoje}.`;
     confianca,
     justificativa: texto(uso.justificativa, 300),
   };
+  const ehAdvertencia = cat.codigo === "advertencias_ocorrencias";
+  const advertencia = ehAdvertencia ? {
+    tipo: ["verbal", "escrita", "suspensao"].includes(String(uso.adv_tipo)) ? String(uso.adv_tipo) : null,
+    dias_suspensao: (() => { const n = parseInt(String(uso.adv_dias_suspensao ?? ""), 10); return n >= 1 && n <= 30 ? n : null; })(),
+    data_ocorrencia: dataISO(uso.adv_data_ocorrencia),
+    motivo: texto(uso.adv_motivo, 80)?.toUpperCase() ?? null,
+    relato: texto(uso.adv_relato, 800),
+    testemunhas: texto(uso.adv_testemunhas, 200)?.toUpperCase() ?? null,
+    assinatura: ["colaborador", "testemunhas", "sem_assinatura"].includes(String(uso.adv_assinatura)) ? String(uso.adv_assinatura) : null,
+  } : null;
 
   await usuario.rpc("registrar_sugestao_ia", {
     p_contexto: {
@@ -220,6 +245,7 @@ Hoje é ${hoje}.`;
 
   return resposta(req, 200, {
     sugestao,
+    advertencia,
     pessoa: { nome: nomePessoa, cpf_mascarado: cpf ? `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**` : null },
     colaborador,
     multiplos,
