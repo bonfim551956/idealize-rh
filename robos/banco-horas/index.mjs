@@ -94,8 +94,18 @@ async function entrar(page) {
     campoCodigo.waitFor({ timeout: 90_000 }).then(() => "codigo"),
   ]).catch(() => "nada");
   if (resultado === "nada") {
-    const erroTela = await page.locator('[id*="error"], .ulp-input-error-message, [role="alert"]').first().innerText().catch(() => "");
-    throw new Erro(`Login não avançou${erroTela ? `: ${erroTela.slice(0, 120)}` : " (usuário/senha ou bloqueio)"}`);
+    // retrato da tela (sem valores digitados) para entender onde parou
+    const tela = await page.evaluate(() => {
+      const vis = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
+      const txt = (sel) => [...document.querySelectorAll(sel)].filter(vis).map((e) => e.innerText.trim().replace(/\s+/g, " ")).filter(Boolean).slice(0, 6);
+      return {
+        url: location.host + location.pathname, titulo: document.title,
+        textos: txt("h1,h2,h3,label,p,[role=alert],.ulp-input-error-message,[id*=error]"),
+        campos: [...document.querySelectorAll("input")].filter(vis).map((i) => `${i.type}:${i.name || i.id}`).slice(0, 8),
+        botoes: txt("button,a[role=button]"),
+      };
+    }).catch(() => null);
+    throw new Erro(`Login não avançou. Tela: ${JSON.stringify(tela).slice(0, 700)}`);
   }
   if (resultado === "codigo") {
     log("VR pediu código; lendo o Gmail");
