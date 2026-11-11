@@ -163,6 +163,25 @@ async function entrar(page) {
   log("logado no SuperPortal");
 }
 
+/* ---------------- Empresa com o RH Digital ---------------- */
+// O login abre na empresa padrão; o RH Digital (Pontomais) está no CNPJ da Idealize Comércio Óptico do Litoral.
+async function escolherEmpresa(page) {
+  const alvo = process.env.VR_CNPJ || "58.849.594/0001-90";
+  await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+  const cabecalho = await page.locator("header").first().innerText().catch(() => "");
+  if (cabecalho.includes(alvo)) { log("empresa certa já selecionada"); return; }
+  log("trocando de empresa no portal");
+  await page.getByText(/^Trocar$/).first().click({ force: true, timeout: 20_000 })
+    .catch(() => { throw new Erro("Não achei o botão Trocar empresa no portal"); });
+  const opcao = page.locator(`[aria-label*="${alvo}"], label:has-text("${alvo}")`).first();
+  await opcao.waitFor({ timeout: 20_000 }).catch(() => { throw new Erro(`O CNPJ ${alvo} não aparece na lista de empresas da VR`); });
+  await opcao.click({ force: true });
+  await page.getByRole("button", { name: /acessar empresa/i }).first().click({ force: true, timeout: 20_000 })
+    .catch(() => { throw new Erro("Não consegui confirmar a troca de empresa"); });
+  await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
+  log("empresa trocada");
+}
+
 /* ---------------- Cabeçalhos da sessão Pontomais (capturados da própria página) ---------------- */
 async function sessaoPontomais(page) {
   const NOMES = ["access-token", "client", "uid", "uuid", "token", "api-version"];
@@ -177,7 +196,7 @@ async function sessaoPontomais(page) {
   });
   await page.goto(`${PORTAL}/pontomais/visao-geral`, { waitUntil: "domcontentloaded", timeout: 90_000 });
   const h = await Promise.race([capturado, espera(120_000).then(() => null)]);
-  if (!h) throw new Erro("Não consegui abrir o RH Digital (Pontomais) dentro do portal");
+  if (!h) throw new Erro(`Não consegui abrir o RH Digital (Pontomais) dentro do portal. Tela: ${await telaAtual(page)}`);
   log("sessão do RH Digital capturada");
   return h;
 }
@@ -317,6 +336,7 @@ async function principal() {
     });
     const page = await ctx.newPage();
     await entrar(page);
+    await escolherEmpresa(page);
     const cab = await sessaoPontomais(page);
     const linhas = lerRelatorio(await gerarBancoHoras(page, cab, periodo.periodo_inicio, periodo.periodo_fim));
     if (!linhas.length) throw new Erro("O relatório de banco de horas veio sem linhas (layout mudou?)");
