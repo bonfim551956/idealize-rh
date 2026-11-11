@@ -231,7 +231,7 @@ function EditorLinhas({ titulo, linhas, setLinhas, colunas, nova }: {
 type DadosTermo = { nome: string; cpf: string; cargo: string; loja: string; admissao: string; rg: string; endereco: string; cepCidade: string;
   empresa: string; cnpj: string; local: string; dataTermo: string };
 
-const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]!));
+export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]!));
 const up = (s: string) => esc(s.toUpperCase());
 const dt = (iso?: string) => (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? dataBR(iso) : esc(iso ?? ""));
 const marca = (b: boolean) => (b ? "(X)" : "(&nbsp;&nbsp;)");
@@ -257,7 +257,7 @@ export async function carregarLogo() {
   } catch { logoDataUrl = `${location.origin}/logo.png`; }
 }
 
-function pagina(titulo: string, corpo: string, sub = "") {
+export function pagina(titulo: string, corpo: string, sub = "") {
   const logo = logoDataUrl || `${location.origin}/logo.png`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>${CSS}</style></head><body>
 <div class="cab"><img src="${logo}" alt="Óticas Idealize"><span>Termo Individual</span></div>
@@ -363,7 +363,7 @@ function termoImagem(d: DadosTermo) {
   "Lei nº 9.610/1998 (Direitos Autorais) &nbsp;|&nbsp; Lei nº 13.709/2018 (LGPD)");
 }
 
-function imprimir(html: string, titulo: string) {
+export function imprimir(html: string, titulo: string) {
   const w = window.open("", "_blank");
   if (!w) { alert("Libere as janelas pop-up deste site para gerar o termo."); return; }
   w.document.open(); w.document.write(html); w.document.title = titulo; w.document.close();
