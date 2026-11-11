@@ -5,6 +5,7 @@ import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
 import { data, hoje } from "../lib/formato";
 import { useCategorias, type ColaboradorLinha } from "../lib/dados";
 import { useAuth } from "../auth/AuthProvider";
+import { GerarTermo, type TipoTermo } from "./Termos";
 import { AreaTexto, Botao, Campo, Cartao, Carregando, EstadoErro, Modal, Selo, useAvisos } from "../ui/componentes";
 
 /* Itens obrigatórios de toda admissão */
@@ -33,31 +34,6 @@ export function useChecklistAdmissao(colaboradorId: string | undefined) {
       return r as ItemChecklist[];
     },
   });
-}
-
-/* Termo padrão para imprimir e assinar */
-function imprimirTermoImagem(c: ColaboradorLinha) {
-  const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]!));
-  const w = window.open("", "_blank");
-  if (!w) return;
-  const hojeTxt = new Date().toLocaleDateString("pt-BR");
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo de autorização de uso de imagem</title>
-<style>body{font-family:Arial,sans-serif;color:#1a1a1a;margin:40px;line-height:1.5;font-size:14px}h1{font-size:18px;text-align:center;margin-bottom:24px}
-ol{padding-left:20px}li{margin-bottom:6px}.ass{margin-top:64px;display:flex;justify-content:space-between;gap:48px}.ass div{flex:1;border-top:1px solid #1a1a1a;padding-top:4px;text-align:center;font-size:12px}</style></head><body>
-<h1>TERMO DE AUTORIZAÇÃO DE USO DE IMAGEM E VOZ</h1>
-<p>Eu, <b>${esc(c.nome_completo)}</b>, CPF ${esc(c.cpf_mascarado)}, colaborador(a) da unidade <b>${esc(c.loja_nome)}</b>, AUTORIZO, de forma gratuita, o uso da minha imagem, voz e nome pelas ÓTICAS IDEALIZE e empresas do grupo, nas seguintes condições:</p>
-<ol>
-<li>Uso em fotos, vídeos e gravações feitos no ambiente de trabalho, em treinamentos, eventos e ações da empresa.</li>
-<li>Divulgação em redes sociais, site, aplicativos de mensagem, materiais impressos, comunicação interna e campanhas institucionais e publicitárias da empresa.</li>
-<li>A autorização vale durante o contrato de trabalho e pelo prazo de 2 (dois) anos após o seu término para os materiais já produzidos, sem obrigação de retirada de conteúdo já publicado nesse período.</li>
-<li>A imagem não será usada de forma que prejudique a minha honra, reputação ou dignidade, nem para fins diferentes dos aqui descritos.</li>
-<li>Os dados serão tratados conforme a Lei Geral de Proteção de Dados (Lei nº 13.709/2018). Posso revogar esta autorização a qualquer momento, por escrito, sem efeito sobre o uso já realizado.</li>
-</ol>
-<p>Declaro que li e concordo com os termos acima.</p>
-<p style="margin-top:32px">________________________, ${esc(hojeTxt)}</p>
-<div class="ass"><div>${esc(c.nome_completo)}<br>Colaborador(a)</div><div>ÓTICAS IDEALIZE<br>Empresa</div></div>
-<script>window.onload=()=>window.print()</script></body></html>`);
-  w.document.close();
 }
 
 const TITULO_REGISTRO = { cartao_vr: "Entrega do cartão VR", cracha: "Entrega de crachá", epi_nao_tem: "Não tem EPI / equipamento para entregar" };
@@ -117,6 +93,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
   const [registrando, setRegistrando] = useState<"cartao_vr" | "cracha" | "epi_nao_tem" | null>(null);
   const [desfazendo, setDesfazendo] = useState<ItemChecklist | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [termo, setTermo] = useState<TipoTermo | "escolher" | null>(null);
   const q = useChecklistAdmissao(c.id);
   if (q.isLoading) return <Carregando />;
   if (q.error) return <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} />;
@@ -176,7 +153,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                 )}
                 {!it?.concluido && k === "termo_imagem" && (
                   <>
-                    <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => imprimirTermoImagem(c)}>Imprimir termo</Botao>
+                    <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>Gerar termo</Botao>
                     {podeAnexar && (
                       <label className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-primaria px-3 text-xs font-medium text-white hover:opacity-90 ${enviando ? "pointer-events-none opacity-60" : ""}`}>
                         <Upload className="size-4" aria-hidden />{enviando ? "Enviando…" : "Anexar termo assinado"}
@@ -185,6 +162,12 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                       </label>
                     )}
                   </>
+                )}
+                {k === "uniforme" && it?.concluido && (
+                  <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("uniforme")}>Gerar termo</Botao>
+                )}
+                {k === "equipamento_epi" && it?.concluido && it.origem === "equipamentos" && (
+                  <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("escolher")}>Gerar termo</Botao>
                 )}
                 {it?.concluido && it.origem === "manual" && it.registro_id && podeEntregar && (
                   <Botao tamanho="sm" variante="secundaria" icone={<Undo2 className="size-4" />} onClick={() => setDesfazendo(it)}>Desfazer</Botao>
@@ -195,6 +178,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
         })}
       </ul>
       <p className="mt-4 text-xs text-texto-suave">Obrigatórios em toda admissão. Enquanto faltar algum item, a pessoa aparece nas Pendências do Painel.</p>
+      {termo && <GerarTermo c={c} tipoInicial={termo === "escolher" ? undefined : termo} fechar={() => setTermo(null)} />}
       {registrando && <RegistrarEntrega c={c} item={registrando} fechar={() => setRegistrando(null)} />}
       {desfazendo?.registro_id && <Desfazer id={desfazendo.registro_id} rotulo={desfazendo.item === "equipamento_epi" ? "Não tem EPI / equipamento para entregar" : ITENS[desfazendo.item].rotulo} fechar={() => setDesfazendo(null)} />}
     </Cartao>
