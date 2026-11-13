@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Pencil, Plus, ShieldCheck, ShieldOff, UserCog, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useCargos, useEmpresas, useLojas, type Loja } from "../lib/dados";
 import { dataHora, so_digitos } from "../lib/formato";
@@ -147,6 +148,7 @@ export function Acessos() {
   const lojas = useLojas();
   const [concedendo, setConcedendo] = useState<Usuario | null>(null);
   const [revogando, setRevogando] = useState<{ a: Atribuicao; u: Usuario } | null>(null);
+  const [alterando, setAlterando] = useState<{ a: Atribuicao; u: Usuario } | null>(null);
 
   const q = useQuery({
     queryKey: ["acessos"],
@@ -177,6 +179,7 @@ export function Acessos() {
         acoes={<a href={`${CENTRAL}/acessos`} target={embutidoNoCentral ? "_top" : "_blank"} rel="noopener noreferrer"
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-primaria px-4 text-sm font-medium text-superficie hover:bg-primaria-escura">
           <ExternalLink className="size-4" aria-hidden />Convidar pelo Central</a>} />
+      <div className="mb-4 flex justify-end"><Link to="/perfis" className="inline-flex h-9 items-center gap-2 rounded-lg border border-borda bg-superficie px-3 text-sm font-medium hover:bg-fundo"><ShieldCheck className="size-4" aria-hidden />Perfis e permissões</Link></div>
       <Aviso tom="info">Novos usuários, senhas e verificação em duas etapas agora são feitos no Central Idealize (Gestão de acessos). Os perfis do RH podem ser dados aqui ou no Central.</Aviso>
       <Cartao>
         {q.isLoading ? <Carregando /> : q.error ? <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} /> : (
@@ -195,6 +198,7 @@ export function Acessos() {
                         {minhas.map((a) => (
                           <li key={a.id} className="inline-flex items-center gap-1 rounded-full border border-borda bg-superficie py-0.5 pl-3 pr-1 text-xs">
                             {q.data!.perfis.find((p) => p.id === a.perfil_id)?.nome} · {nomeLoja(a.loja_id)}
+                            {!proprio && <button className="rounded-full p-1 text-texto-suave hover:bg-primaria-suave hover:text-primaria" aria-label="Alterar perfil" title="Alterar perfil" onClick={() => setAlterando({ a, u })}><Pencil className="size-3" /></button>}
                             {!proprio && <button className="rounded-full p-1 text-texto-suave hover:bg-perigo-suave hover:text-perigo" aria-label="Revogar acesso" onClick={() => setRevogando({ a, u })}><X className="size-3" /></button>}
                           </li>
                         ))}
@@ -213,6 +217,7 @@ export function Acessos() {
       </Cartao>
       {concedendo && q.data && <Conceder usuario={concedendo} perfis={q.data.perfis} fechar={() => setConcedendo(null)} />}
       {revogando && <Revogar {...revogando} fechar={() => setRevogando(null)} />}
+      {alterando && q.data && <Conceder usuario={alterando.u} atual={alterando.a} perfis={q.data.perfis} fechar={() => setAlterando(null)} />}
     </>
   );
 }
@@ -226,26 +231,27 @@ function ConvitePendente({ desde }: { u: Usuario; desde: string }) {
   );
 }
 
-function Conceder({ usuario, perfis, fechar }: { usuario: Usuario; perfis: Perfil[]; fechar: () => void }) {
+function Conceder({ usuario, perfis, fechar, atual }: { usuario: Usuario; perfis: Perfil[]; fechar: () => void; atual?: Atribuicao }) {
   const lojas = useLojas();
   const qc = useQueryClient();
   const avisar = useAvisos();
-  const [f, setF] = useState({ perfil: "", loja: "", motivo: "", validade: "" });
+  const [f, setF] = useState({ perfil: atual ? perfis.find((p) => p.id === atual.perfil_id)?.codigo ?? "" : "", loja: atual?.loja_id ?? "", motivo: "",
+    validade: atual?.valido_ate ? atual.valido_ate.slice(0, 10) : "" });
   const perfil = perfis.find((p) => p.codigo === f.perfil);
   const exigeLoja = f.perfil === "gerente_loja";
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("conceder_acesso", {
-        p_usuario: usuario.id, p_perfil_codigo: f.perfil, p_loja: f.loja || null, p_motivo: f.motivo || null,
-        p_valido_ate: f.validade ? `${f.validade}T23:59:59-03:00` : null,
-      });
+      const validade = f.validade ? `${f.validade}T23:59:59-03:00` : null;
+      const { error } = atual
+        ? await supabase.rpc("trocar_acesso", { p_atribuicao: atual.id, p_perfil_codigo: f.perfil, p_loja: f.loja || null, p_valido_ate: validade, p_motivo: f.motivo })
+        : await supabase.rpc("conceder_acesso", { p_usuario: usuario.id, p_perfil_codigo: f.perfil, p_loja: f.loja || null, p_motivo: f.motivo || null, p_valido_ate: validade });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", "Acesso concedido."); fechar(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["acessos"] }); avisar("sucesso", atual ? "Perfil alterado." : "Acesso concedido."); fechar(); },
     onError: (e) => avisar("erro", mensagemErro(e)),
   });
   return (
-    <Modal aberto aoFechar={fechar} titulo="Conceder acesso" descricao={`${usuario.nome} · ${usuario.email}`}>
+    <Modal aberto aoFechar={fechar} titulo={atual ? "Alterar perfil" : "Conceder acesso"} descricao={`${usuario.nome} · ${usuario.email}`}>
       <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="flex flex-col gap-4">
         <Selecao rotulo="Perfil" value={f.perfil} onChange={(e) => setF({ ...f, perfil: e.target.value })} obrigatorio>
           <option value="">Selecione</option>
@@ -260,10 +266,11 @@ function Conceder({ usuario, perfis, fechar }: { usuario: Usuario; perfis: Perfi
         </Selecao>
         <Campo rotulo="Válido até (opcional)" type="date" value={f.validade} onChange={(e) => setF({ ...f, validade: e.target.value })}
           dica="Útil para jurídico ou contabilidade em um caso específico." />
-        <AreaTexto rotulo="Motivo" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} />
+        <AreaTexto rotulo="Motivo" value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} obrigatorio={!!atual}
+          dica={atual ? "O acesso anterior é encerrado e o novo começa na hora. Os dois ficam no histórico da auditoria." : undefined} />
         <div className="flex justify-end gap-2">
           <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
-          <Botao type="submit" carregando={m.isPending} disabled={!f.perfil || (exigeLoja && !f.loja)}>Conceder</Botao>
+          <Botao type="submit" carregando={m.isPending} disabled={!f.perfil || (exigeLoja && !f.loja) || (!!atual && !f.motivo.trim())}>{atual ? "Salvar alteração" : "Conceder"}</Botao>
         </div>
       </form>
     </Modal>
@@ -286,6 +293,190 @@ function Revogar({ a, u, fechar }: { a: Atribuicao; u: Usuario; fechar: () => vo
         <div className="flex justify-end gap-2">
           <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
           <Botao type="submit" variante="perigo" carregando={m.isPending} disabled={!motivo.trim()}>Revogar</Botao>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* =====================================================================
+   Perfis e permissões
+   ===================================================================== */
+type Permissao = { codigo: string; modulo: string; descricao: string; exige_mfa: boolean; sensivel: boolean };
+type PerfilCompleto = Perfil & { de_sistema: boolean };
+
+const MODULOS: Record<string, string> = {
+  pessoas: "Colaboradores", documentos: "Documentos", ausencias: "Ausências e atestados", remuneracao: "Salários",
+  equipamentos: "Equipamentos", uniformes: "Uniformes", vt: "Vale-transporte", tarefas: "Tarefas", dashboard: "Painel",
+  relatorios: "Relatórios", configuracao: "Estrutura", acesso: "Acessos", auditoria: "Auditoria",
+};
+const ORDEM_MODULOS = Object.keys(MODULOS);
+const frase = (t: string) => t ? t.charAt(0) + t.slice(1).toLowerCase().replace(/"([a-zçãéí]+)"/g, (_, w) => `“${w}”`).replace(/\b(vt|cpf|dp|mfa|epi)\b/g, (w) => w.toUpperCase()) : t;
+
+export function Perfis() {
+  const qc = useQueryClient();
+  const avisar = useAvisos();
+  const { sessao } = useAuth();
+  const [sel, setSel] = useState<string | null>(null);
+  const [marcadas, setMarcadas] = useState<Set<string> | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [novo, setNovo] = useState(false);
+  const [editandoInfo, setEditandoInfo] = useState<PerfilCompleto | null>(null);
+
+  const q = useQuery({
+    queryKey: ["perfis-permissoes"],
+    queryFn: async () => {
+      const [p, pp, perm, a] = await Promise.all([
+        supabase.from("perfis").select("id,codigo,nome,descricao,de_sistema").order("nome"),
+        supabase.from("perfil_permissoes").select("perfil_id,permissao"),
+        supabase.from("permissoes").select("codigo,modulo,descricao,exige_mfa,sensivel").order("codigo"),
+        supabase.from("usuario_atribuicoes").select("usuario_id,perfil_id").eq("ativo", true),
+      ]);
+      return { perfis: falhar(p) as PerfilCompleto[], pp: falhar(pp) as { perfil_id: string; permissao: string }[],
+        permissoes: falhar(perm) as Permissao[], atrib: falhar(a) as { usuario_id: string; perfil_id: string }[] };
+    },
+  });
+
+  const perfis = q.data?.perfis.filter((p) => p.codigo !== "colaborador") ?? [];
+  const atual = perfis.find((p) => p.id === sel) ?? perfis[0];
+  const doPerfil = useMemo(() => new Set((q.data?.pp ?? []).filter((x) => x.perfil_id === atual?.id).map((x) => x.permissao)), [q.data, atual?.id]);
+  const marc = marcadas ?? doPerfil;
+  const proprio = !!atual && !!q.data?.atrib.some((a) => a.perfil_id === atual.id && a.usuario_id === sessao?.user.id);
+  const usuariosNoPerfil = atual ? new Set(q.data?.atrib.filter((a) => a.perfil_id === atual.id).map((a) => a.usuario_id)).size : 0;
+  const incluidas = [...marc].filter((c) => !doPerfil.has(c));
+  const retiradas = [...doPerfil].filter((c) => !marc.has(c));
+  const mudou = incluidas.length + retiradas.length > 0;
+
+  const grupos = useMemo(() => {
+    const g = new Map<string, Permissao[]>();
+    for (const p of q.data?.permissoes ?? []) g.set(p.modulo, [...(g.get(p.modulo) ?? []), p]);
+    return [...g.entries()].sort((a, b) => ORDEM_MODULOS.indexOf(a[0]) - ORDEM_MODULOS.indexOf(b[0]));
+  }, [q.data]);
+
+  const trocar = (id: string) => {
+    if (mudou && !confirmarDescarte()) return;
+    setSel(id); setMarcadas(null); setMotivo("");
+  };
+  const confirmarDescarte = () => window.confirm("Há alterações não salvas neste perfil. Descartar?");
+  const alternar = (c: string, v: boolean) => { const n = new Set(marc); if (v) n.add(c); else n.delete(c); setMarcadas(n); };
+  const alternarModulo = (lista: Permissao[], v: boolean) => { const n = new Set(marc); lista.forEach((p) => v ? n.add(p.codigo) : n.delete(p.codigo)); setMarcadas(n); };
+
+  const salvar = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("perfil_permissoes_definir", { p_perfil: atual!.id, p_permissoes: [...marc], p_motivo: motivo });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["perfis-permissoes"] }); qc.invalidateQueries({ queryKey: ["acessos"] });
+      setMarcadas(null); setMotivo(""); avisar("sucesso", "Permissões do perfil atualizadas. Quem tem este perfil vê a mudança no próximo acesso."); },
+    onError: (e) => avisar("erro", mensagemErro(e)),
+  });
+
+  return (
+    <>
+      <CabecalhoPagina titulo="Perfis e permissões" descricao="O que cada perfil pode ver e fazer no sistema. Toda alteração fica na auditoria com o motivo."
+        acoes={<Botao icone={<Plus className="size-4" />} onClick={() => setNovo(true)}>Novo perfil</Botao>} />
+      {q.isLoading ? <Carregando /> : q.error ? <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} /> : !atual ? <EstadoVazio titulo="Nenhum perfil" /> : (
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <div className="lg:sticky lg:top-4 lg:self-start"><Cartao titulo="Perfis">
+            <ul className="-mx-2 flex flex-col">
+              {perfis.map((p) => {
+                const n = q.data!.pp.filter((x) => x.perfil_id === p.id).length;
+                return (
+                  <li key={p.id}>
+                    <button onClick={() => trocar(p.id)} className={`w-full rounded-lg px-3 py-2 text-left text-sm ${p.id === atual.id ? "bg-primaria-suave font-medium text-primaria-escura" : "hover:bg-fundo"}`}>
+                      <span className="block">{p.nome}</span>
+                      <span className="text-xs text-texto-suave">{n} permiss{n === 1 ? "ão" : "ões"}{!p.de_sistema && " · criado aqui"}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Cartao></div>
+          <div className="flex flex-col gap-4">
+            <Cartao titulo={atual.nome} acao={!proprio && <Botao tamanho="sm" variante="secundaria" icone={<Pencil className="size-4" />} onClick={() => setEditandoInfo(atual)}>{atual.de_sistema ? "Editar descrição" : "Editar nome e descrição"}</Botao>}>
+              <p className="text-sm text-texto-suave">{atual.descricao ? frase(atual.descricao) : "Sem descrição."}</p>
+              <p className="mt-2 text-xs text-texto-suave">{usuariosNoPerfil} usuário{usuariosNoPerfil === 1 ? "" : "s"} com este perfil</p>
+              {proprio && <div className="mt-3"><Aviso tom="alerta">Você tem este perfil, então não pode alterá-lo (ninguém aumenta o próprio acesso). Outra pessoa que gerencia acessos precisa fazer a mudança.</Aviso></div>}
+            </Cartao>
+            {grupos.map(([modulo, lista]) => {
+              const todas = lista.every((p) => marc.has(p.codigo));
+              return (
+                <Cartao key={modulo} titulo={MODULOS[modulo] ?? modulo}
+                  acao={!proprio && <button className="text-xs font-medium text-primaria hover:underline" onClick={() => alternarModulo(lista, !todas)}>{todas ? "Desmarcar todas" : "Marcar todas"}</button>}>
+                  <ul className="flex flex-col divide-y divide-borda">
+                    {lista.map((p) => {
+                      const novoEstado = marc.has(p.codigo) !== doPerfil.has(p.codigo);
+                      return (
+                        <li key={p.codigo} className={`flex items-start gap-3 py-2 ${novoEstado ? "-mx-2 rounded-md bg-alerta-suave px-2" : ""}`}>
+                          <input id={`perm-${p.codigo}`} type="checkbox" className="mt-1 size-4 accent-[var(--color-primaria)]" disabled={proprio}
+                            checked={marc.has(p.codigo)} onChange={(e) => alternar(p.codigo, e.target.checked)} />
+                          <label htmlFor={`perm-${p.codigo}`} className="flex-1 text-sm">
+                            {frase(p.descricao)}
+                            <span className="ml-2 inline-flex gap-1 align-middle">
+                              {p.exige_mfa && <Selo tom="info">Exige verificação em 2 etapas</Selo>}
+                              {p.sensivel && !p.exige_mfa && <Selo>Dado sensível</Selo>}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Cartao>
+              );
+            })}
+            {mudou && (
+              <div className="sticky bottom-4 rounded-xl border border-borda bg-superficie p-4 shadow-lg">
+                <p className="text-sm font-medium">
+                  {incluidas.length > 0 && <span className="text-sucesso">+{incluidas.length} incluída{incluidas.length > 1 ? "s" : ""}</span>}
+                  {incluidas.length > 0 && retiradas.length > 0 && " · "}
+                  {retiradas.length > 0 && <span className="text-perigo">−{retiradas.length} retirada{retiradas.length > 1 ? "s" : ""}</span>}
+                  <span className="font-normal text-texto-suave"> · {usuariosNoPerfil === 0 ? "nenhum usuário tem este perfil ainda" : usuariosNoPerfil === 1 ? "vale para o 1 usuário deste perfil" : `vale para os ${usuariosNoPerfil} usuários deste perfil`}</span>
+                </p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1"><Campo rotulo="Motivo da alteração" value={motivo} onChange={(e) => setMotivo(e.target.value)} obrigatorio /></div>
+                  <div className="flex gap-2">
+                    <Botao variante="secundaria" onClick={() => { setMarcadas(null); setMotivo(""); }}>Descartar</Botao>
+                    <Botao carregando={salvar.isPending} disabled={!motivo.trim()} onClick={() => salvar.mutate()}>Salvar permissões</Botao>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {novo && q.data && <PerfilInfo perfis={perfis} fechar={() => setNovo(false)} aoCriar={(id) => { setSel(id); setMarcadas(null); }} />}
+      {editandoInfo && <PerfilInfo perfis={perfis} perfil={editandoInfo} fechar={() => setEditandoInfo(null)} />}
+    </>
+  );
+}
+
+function PerfilInfo({ perfil, perfis, fechar, aoCriar }: { perfil?: PerfilCompleto; perfis: PerfilCompleto[]; fechar: () => void; aoCriar?: (id: string) => void }) {
+  const qc = useQueryClient();
+  const avisar = useAvisos();
+  const [f, setF] = useState({ nome: perfil?.nome ?? "", descricao: perfil?.descricao ?? "", copiar: "" });
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("perfil_salvar", { p_id: perfil?.id ?? null, p_nome: f.nome, p_descricao: f.descricao, p_copiar_de: f.copiar || null });
+      if (error) throw error; return data as string;
+    },
+    onSuccess: (id) => { qc.invalidateQueries({ queryKey: ["perfis-permissoes"] }); qc.invalidateQueries({ queryKey: ["acessos"] });
+      avisar("sucesso", perfil ? "Perfil atualizado." : "Perfil criado. Agora marque o que ele pode fazer."); aoCriar?.(id); fechar(); },
+    onError: (e) => avisar("erro", mensagemErro(e)),
+  });
+  return (
+    <Modal aberto aoFechar={fechar} titulo={perfil ? "Editar perfil" : "Novo perfil"} descricao={perfil?.de_sistema ? "Perfil padrão do sistema: o nome fica fixo, a descrição pode mudar." : undefined}>
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); m.mutate(); }} className="flex flex-col gap-4">
+        <Campo rotulo="Nome" value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} obrigatorio disabled={perfil?.de_sistema} />
+        <AreaTexto rotulo="Descrição" value={f.descricao} onChange={(e) => setF({ ...f, descricao: e.target.value })} dica="Aparece para quem concede o acesso." />
+        {!perfil && (
+          <Selecao rotulo="Começar com as permissões de" value={f.copiar} onChange={(e) => setF({ ...f, copiar: e.target.value })} dica="Opcional. Depois você ajusta uma a uma.">
+            <option value="">Nenhuma (perfil vazio)</option>
+            {perfis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </Selecao>
+        )}
+        <div className="flex justify-end gap-2">
+          <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
+          <Botao type="submit" carregando={m.isPending} disabled={!f.nome.trim()}>{perfil ? "Salvar" : "Criar perfil"}</Botao>
         </div>
       </form>
     </Modal>
