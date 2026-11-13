@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, FileClock, Link2, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, FileClock, Filter, Link2, RotateCcw, Siren, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { useAuth } from "../auth/AuthProvider";
 import { useLojas } from "../lib/dados";
@@ -95,7 +95,7 @@ function RelatorioPessoa({ l, fechar }: { l: Linha; fechar: () => void }) {
                   <tr key={d.data}>
                     <td className="whitespace-nowrap px-3 py-2 tabular-nums">{diaSemana(d.data)}, {data(d.data)}</td>
                     <td className="px-3 py-2 tabular-nums text-sucesso">{d.positivas_min ? horas(d.positivas_min) : "—"}</td>
-                    <td className="px-3 py-2 tabular-nums text-perigo">{d.negativas_min ? horas(d.negativas_min) : "—"}</td>
+                    <td className="px-3 py-2 tabular-nums text-perigo">{d.negativas_min ? horas(-Math.abs(d.negativas_min)) : "—"}</td>
                     <td className={cx("px-3 py-2 tabular-nums", tomSaldo(d.saldo_min))}>{horas(d.saldo_min)}</td>
                     <td className="px-3 py-2 text-xs">
                       {(pendDia.get(d.data) ?? []).map((p, i) => (
@@ -160,12 +160,68 @@ function Vincular({ s, fechar }: { s: SemVinculo; fechar: () => void }) {
   );
 }
 
+const ABERTA = (p: Pendencia) => !p.status || !/aprovad|abonad|justificad|resolvid/i.test(p.status);
+const URGENTE = (p: Pendencia) => p.tipo === "registro_faltando" || p.tipo === "falta";
+const diasAtras = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(`${iso}T12:00:00`).getTime()) / 86400e3));
+type Filtros = { saldo: "" | "negativo" | "muito_negativo" | "positivo" | "muito_positivo" | "subindo"; pendencia: "" | "com" | "sem"; tipo: string; equipe: string; periodo: string; ordem: "problemas" | "saldo_asc" | "saldo_desc" | "nome" };
+const FILTROS_PADRAO: Filtros = { saldo: "", pendencia: "", tipo: "", equipe: "", periodo: "35", ordem: "problemas" };
+
+/* Bloco fixo no topo: tudo que precisa ser corrigido agora */
+function ParaCorrigir({ pend, semVinculo, falhou, abrirPessoa, verSemVinculo }: {
+  pend: Pendencia[]; semVinculo: number; falhou: boolean; abrirPessoa: (id: string) => void; verSemVinculo: () => void;
+}) {
+  const porPessoa = new Map<string, { nome: string; loja: string | null; itens: Pendencia[] }>();
+  pend.forEach((p) => { const g = porPessoa.get(p.colaborador_id) ?? { nome: p.colaborador_nome, loja: p.loja_nome, itens: [] }; g.itens.push(p); porPessoa.set(p.colaborador_id, g); });
+  const grupos = [...porPessoa.entries()].map(([id, g]) => ({ id, ...g, itens: [...g.itens].sort((a, b) => a.data.localeCompare(b.data)) }))
+    .sort((a, b) => a.itens[0].data.localeCompare(b.itens[0].data));
+  const total = pend.length + semVinculo + (falhou ? 1 : 0);
+  if (total === 0) return (
+    <div className="flex items-center gap-3 rounded-xl border border-sucesso/40 bg-sucesso-suave px-4 py-3 text-sm text-sucesso">
+      <CheckCircle2 className="size-5" aria-hidden /><span><b>Nada para corrigir.</b> Nenhum registro de ponto em aberto nos filtros escolhidos.</span>
+    </div>
+  );
+  return (
+    <section aria-labelledby="corrigir" className="rounded-xl border-2 border-perigo/50 bg-perigo-suave/60 p-4">
+      <h2 id="corrigir" className="flex items-center gap-2 font-display text-lg font-semibold text-perigo"><Siren className="size-5" aria-hidden />Para corrigir agora ({total})</h2>
+      <p className="mt-1 text-sm text-texto">Pontos que estão errados no VR. Corrija no RH Digital da VR; na próxima leitura (todo dia às 9h) o item some daqui. Mais antigos primeiro.</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {falhou && <div className="rounded-lg border border-perigo/40 bg-superficie px-3 py-2 text-sm"><b>A leitura do VR falhou.</b> Os dados podem estar desatualizados. Veja o motivo no aviso abaixo.</div>}
+        {semVinculo > 0 && (
+          <button type="button" onClick={verSemVinculo} className="rounded-lg border border-alerta/50 bg-superficie px-3 py-2 text-left text-sm hover:border-alerta">
+            <b>{semVinculo} nome(s) do VR sem colaborador no RH 360.</b> O saldo dessas pessoas não aparece na lista. <span className="text-primaria underline">Vincular</span>
+          </button>
+        )}
+        {grupos.map((g) => {
+          const velho = diasAtras(g.itens[0].data);
+          return (
+            <div key={g.id} className="flex flex-col gap-2 rounded-lg border border-borda bg-superficie px-3 py-2 sm:flex-row sm:items-start">
+              <div className="sm:w-64 sm:shrink-0">
+                <button type="button" onClick={() => abrirPessoa(g.id)} className="text-left font-medium hover:text-primaria hover:underline">{g.nome}</button>
+                <p className="text-xs text-texto-suave">{g.loja?.replace(/^ÓTICAS IDEALIZE /, "") ?? "—"} · {g.itens.length} item(ns){velho >= 7 && <span className="font-medium text-perigo"> · mais antigo há {velho} dias</span>}</p>
+              </div>
+              <ul className="flex flex-1 flex-wrap gap-1.5">
+                {g.itens.map((p, i) => (
+                  <li key={i} className={cx("whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium",
+                    URGENTE(p) ? "border-perigo/50 bg-perigo-suave text-perigo" : "border-alerta/50 bg-alerta-suave text-alerta")}>
+                    {diaSemana(p.data)} {data(p.data).slice(0, 5)} · {TIPO_PEND[p.tipo] ?? p.descricao}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export function BancoHoras() {
   const { pode } = useAuth();
   const lojas = useLojas();
   const [loja, setLoja] = useState("");
   const [busca, setBusca] = useState("");
-  const [filtro, setFiltro] = useState<"" | "negativo" | "positivo" | "subindo" | "registros">("");
+  const [f, setF] = useState<Filtros>(FILTROS_PADRAO);
+  const [verFiltros, setVerFiltros] = useState(true);
   const [params, setParams] = useSearchParams();
   const [vinculando, setVinculando] = useState<SemVinculo | null>(null);
   const q = useQuery({
@@ -176,32 +232,95 @@ export function BancoHoras() {
       return r as Resumo;
     },
   });
-  const linhas = useMemo(() => (q.data?.linhas ?? []).filter((l) =>
-    (!busca || l.colaborador_nome.toLowerCase().includes(busca.toLowerCase())) &&
-    (!filtro || (filtro === "negativo" ? l.saldo_min < 0 : filtro === "positivo" ? l.saldo_min > 0
-      : filtro === "subindo" ? (l.var7_min ?? 0) >= SUBINDO : l.registros_7d > 0))), [q.data, busca, filtro]);
   const todos = q.data?.linhas ?? [];
+  const equipes = useMemo(() => [...new Set(todos.map((l) => l.departamento).filter(Boolean) as string[])].sort(), [todos]);
+  const limite = new Date(Date.now() - Number(f.periodo) * 86400e3).toISOString().slice(0, 10);
+  const deptoDe = useMemo(() => new Map(todos.map((l) => [l.colaborador_id, l.departamento])), [todos]);
+  const nomeOk = (n: string) => !busca || n.toLowerCase().includes(busca.toLowerCase());
+  const pendAbertas = (q.data?.pendencias ?? []).filter((p) => ABERTA(p) && p.data >= limite && nomeOk(p.colaborador_nome)
+    && (!f.tipo || p.tipo === f.tipo) && (!f.equipe || deptoDe.get(p.colaborador_id) === f.equipe));
+  const pendPorPessoa = new Map<string, number>();
+  pendAbertas.forEach((p) => pendPorPessoa.set(p.colaborador_id, (pendPorPessoa.get(p.colaborador_id) ?? 0) + 1));
+  const nPend = (id: string) => pendPorPessoa.get(id) ?? 0;
+  const passaSaldo = (l: Linha) => !f.saldo || (f.saldo === "negativo" ? l.saldo_min < 0 : f.saldo === "muito_negativo" ? l.saldo_min <= -1200
+    : f.saldo === "positivo" ? l.saldo_min > 0 : f.saldo === "muito_positivo" ? l.saldo_min >= 2400 : (l.var7_min ?? 0) >= SUBINDO);
+  const linhas = todos.filter((l) => nomeOk(l.colaborador_nome) && passaSaldo(l) && (!f.equipe || l.departamento === f.equipe)
+    && (!f.pendencia || (f.pendencia === "com") === nPend(l.colaborador_id) > 0))
+    .sort((a, b) => f.ordem === "nome" ? a.colaborador_nome.localeCompare(b.colaborador_nome) : f.ordem === "saldo_asc" ? a.saldo_min - b.saldo_min
+      : f.ordem === "saldo_desc" ? b.saldo_min - a.saldo_min : (nPend(b.colaborador_id) - nPend(a.colaborador_id)) || a.saldo_min - b.saldo_min);
+  const filtrosAtivos = (Object.keys(f) as (keyof Filtros)[]).filter((k) => f[k] !== FILTROS_PADRAO[k]).length + (busca ? 1 : 0) + (loja ? 1 : 0);
+  const filtro = f.pendencia === "com" && !f.saldo ? "registros" : f.saldo;
+  const alternar = (x: "negativo" | "positivo" | "subindo" | "registros") => setF(filtro === x ? { ...f, saldo: "", pendencia: "" }
+    : x === "registros" ? { ...f, saldo: "", pendencia: "com" } : { ...f, saldo: x, pendencia: "" });
   const ult = q.data?.ultima_execucao; const ok = q.data?.ultima_ok;
   const pessoa = todos.find((l) => l.colaborador_id === params.get("pessoa")) ?? null;
   const abrir = (l: Linha | null) => { const p = new URLSearchParams(params); if (l) p.set("pessoa", l.colaborador_id); else p.delete("pessoa"); setParams(p, { replace: true }); };
-  const alternar = (f: typeof filtro) => setFiltro(filtro === f ? "" : f);
   const atrasado = !ok || Date.now() - new Date(ok.executado_em).getTime() > 50 * 3600e3;
 
   return (
     <div className="flex flex-col gap-6">
       <CabecalhoPagina titulo="Banco de horas"
         descricao="Saldo de banco de horas de cada colaborador, lido todo dia às 9h do RH Digital da VR (Pontomais)."
-        acoes={(lojas.data?.length ?? 0) > 1 && (
-          <Selecao rotulo="Loja" value={loja} onChange={(e) => setLoja(e.target.value)} className="w-56">
-            <option value="">Todas as lojas</option>
-            {lojas.data!.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
-          </Selecao>
-        )} />
+        acoes={<Botao variante="secundaria" icone={<Filter className="size-4" />} onClick={() => setVerFiltros(!verFiltros)}>
+          {verFiltros ? "Esconder filtros" : "Filtros"}{filtrosAtivos > 0 ? ` (${filtrosAtivos})` : ""}</Botao>} />
+
+      {verFiltros && (
+        <Cartao>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Campo rotulo="Buscar colaborador" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome" />
+            {(lojas.data?.length ?? 0) > 1 && (
+              <Selecao rotulo="Loja" value={loja} onChange={(e) => setLoja(e.target.value)}>
+                <option value="">Todas as lojas</option>
+                {lojas.data!.map((l) => <option key={l.id} value={l.id}>{l.nome.replace(/^ÓTICAS IDEALIZE /, "")}</option>)}
+              </Selecao>
+            )}
+            <Selecao rotulo="Equipe no VR" value={f.equipe} onChange={(e) => setF({ ...f, equipe: e.target.value })}>
+              <option value="">Todas</option>
+              {equipes.map((x) => <option key={x} value={x}>{x}</option>)}
+            </Selecao>
+            <Selecao rotulo="Saldo" value={f.saldo} onChange={(e) => setF({ ...f, saldo: e.target.value as Filtros["saldo"] })}>
+              <option value="">Todos</option>
+              <option value="negativo">Negativo</option>
+              <option value="muito_negativo">Muito negativo (−20h ou menos)</option>
+              <option value="positivo">Positivo</option>
+              <option value="muito_positivo">Muito positivo (+40h ou mais)</option>
+              <option value="subindo">Subindo (+2h em 7 dias)</option>
+            </Selecao>
+            <Selecao rotulo="Ponto" value={f.pendencia} onChange={(e) => setF({ ...f, pendencia: e.target.value as Filtros["pendencia"] })}>
+              <option value="">Todos</option>
+              <option value="com">Com registro para corrigir</option>
+              <option value="sem">Sem pendência</option>
+            </Selecao>
+            <Selecao rotulo="Tipo de pendência" value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>
+              <option value="">Todos</option>
+              {Object.entries(TIPO_PEND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </Selecao>
+            <Selecao rotulo="Período das pendências" value={f.periodo} onChange={(e) => setF({ ...f, periodo: e.target.value })}>
+              <option value="7">Últimos 7 dias</option>
+              <option value="15">Últimos 15 dias</option>
+              <option value="35">Últimos 35 dias</option>
+            </Selecao>
+            <Selecao rotulo="Ordenar por" value={f.ordem} onChange={(e) => setF({ ...f, ordem: e.target.value as Filtros["ordem"] })}>
+              <option value="problemas">Problemas primeiro</option>
+              <option value="saldo_asc">Menor saldo</option>
+              <option value="saldo_desc">Maior saldo</option>
+              <option value="nome">Nome</option>
+            </Selecao>
+          </div>
+          {filtrosAtivos > 0 && (
+            <button type="button" onClick={() => { setF(FILTROS_PADRAO); setBusca(""); setLoja(""); }}
+              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primaria hover:underline"><RotateCcw className="size-3.5" aria-hidden />Limpar filtros</button>
+          )}
+        </Cartao>
+      )}
 
       {q.isLoading && <Carregando />}
       {q.error && <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} />}
       {q.data && (
         <>
+          <ParaCorrigir pend={pendAbertas} semVinculo={q.data.sem_vinculo.length} falhou={!!ult && (ult.status === "erro" || atrasado)}
+            abrirPessoa={(id) => { const l = todos.find((x) => x.colaborador_id === id); if (l) abrir(l); }}
+            verSemVinculo={() => document.getElementById("sem-vinculo")?.scrollIntoView({ behavior: "smooth" })} />
           {!ult ? (
             <Aviso tom="info">O robô do VR ainda não rodou. Assim que rodar pela primeira vez, os saldos aparecem aqui.</Aviso>
           ) : ult.status === "erro" || atrasado ? (
@@ -223,15 +342,15 @@ export function BancoHoras() {
               ativo={filtro === "positivo"} onClick={() => alternar("positivo")} />
             <Indicador rotulo="Subindo (+2h em 7 dias)" valor={todos.filter((l) => (l.var7_min ?? 0) >= SUBINDO).length} icone={ArrowUpRight} tom="bg-alerta-suave text-alerta"
               ativo={filtro === "subindo"} onClick={() => alternar("subindo")} />
-            <Indicador rotulo="Registro faltando (7 dias)" valor={todos.filter((l) => l.registros_7d > 0).length} icone={FileClock} tom="bg-info-suave text-info"
+            <Indicador rotulo="Com ponto para corrigir" valor={pendPorPessoa.size} icone={FileClock} tom="bg-info-suave text-info"
               ativo={filtro === "registros"} onClick={() => alternar("registros")} />
           </div>
 
-          <Cartao titulo={`Saldos (${linhas.length})`} acao={<Campo rotulo="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome" className="w-48" />}>
+          <Cartao titulo={`Saldos (${linhas.length})`}>
             {linhas.length === 0 ? <EstadoVazio titulo="Nada aqui" descricao="Nenhum colaborador com esse filtro." /> : (
-              <Tabela cabecalho={["Colaborador", "Loja", "Saldo atual", "Últimos 7 dias", "No mês: + / −", "Registros", "Saldo em"]}>
+              <Tabela cabecalho={["Colaborador", "Loja", "Saldo atual", "Últimos 7 dias", "No mês: + / −", "Ponto", "Saldo em"]}>
                 {linhas.map((l) => (
-                  <tr key={l.nome_norm} className="hover:bg-fundo">
+                  <tr key={l.nome_norm} className={cx("hover:bg-fundo", nPend(l.colaborador_id) > 0 && "bg-perigo-suave/50 shadow-[inset_4px_0_0_var(--color-perigo)]")}>
                     <td className="px-4 py-3">
                       <button type="button" onClick={() => abrir(l)} className="text-left font-medium hover:text-primaria hover:underline">{l.colaborador_nome}</button>
                       {l.departamento && <p className="text-xs text-texto-suave">{l.departamento}</p>}
@@ -242,8 +361,10 @@ export function BancoHoras() {
                       {l.var7_min === null ? "—" : <>{(l.var7_min ?? 0) >= SUBINDO && <ArrowUpRight className="mr-0.5 inline size-3.5" aria-label="subindo" />}{horas(l.var7_min)}</>}
                     </td>
                     <td className="px-4 py-3 tabular-nums"><span className="text-sucesso">{l.mes_positivas_min ? horas(l.mes_positivas_min) : "—"}</span>
-                      <span className="text-texto-suave"> / </span><span className="text-perigo">{l.mes_negativas_min ? horas(l.mes_negativas_min) : "—"}</span></td>
-                    <td className="px-4 py-3">{l.registros_7d > 0 ? <span className="whitespace-nowrap rounded-full border border-alerta px-2 py-0.5 text-xs font-medium text-alerta">{l.registros_7d} faltando</span> : <span className="text-texto-suave">—</span>}</td>
+                      <span className="text-texto-suave"> / </span><span className="text-perigo">{l.mes_negativas_min ? horas(-Math.abs(l.mes_negativas_min)) : "—"}</span></td>
+                    <td className="px-4 py-3">{nPend(l.colaborador_id) > 0
+                      ? <span className="whitespace-nowrap rounded-full border border-perigo/50 bg-superficie px-2 py-0.5 text-xs font-medium text-perigo">{nPend(l.colaborador_id)} para corrigir</span>
+                      : <span className="text-texto-suave">—</span>}</td>
                     <td className="px-4 py-3 tabular-nums text-texto-suave">{data(l.data)}</td>
                   </tr>
                 ))}
@@ -253,19 +374,19 @@ export function BancoHoras() {
               Clique no nome para ver o relatório dia a dia. Vermelho: saldo negativo (forte a partir de −20h). Laranja: acima de +40h ou subindo. Ajustes continuam sendo feitos no RH Digital da VR.</p>
           </Cartao>
 
-          {q.data.pendencias.length > 0 && (
-            <Cartao titulo={`Registros de ponto em aberto (${q.data.pendencias.length})`}>
-              <p className="mb-3 text-sm text-texto-suave">Últimos 35 dias, conforme o relatório de pendências do VR: batidas faltando, faltas sem justificativa e ajustes ou abonos esperando aprovação.</p>
+          {pendAbertas.length > 0 && (
+            <Cartao titulo={`Registros de ponto em aberto (${pendAbertas.length})`}>
+              <p className="mb-3 text-sm text-texto-suave">Conforme o relatório de pendências do VR, no período escolhido nos filtros: batidas faltando, faltas sem justificativa e ajustes ou abonos esperando aprovação.</p>
               <Tabela cabecalho={["Dia", "Colaborador", "Loja", "Pendência", "Situação no VR"]}>
-                {q.data.pendencias.map((p, i) => (
-                  <tr key={i} className="hover:bg-fundo">
-                    <td className="px-4 py-3 tabular-nums">{diaSemana(p.data)}, {data(p.data)}</td>
+                {[...pendAbertas].sort((a, b) => a.data.localeCompare(b.data)).map((p, i) => (
+                  <tr key={i} className={cx("hover:bg-fundo", URGENTE(p) && "bg-perigo-suave/40")}>
+                    <td className="whitespace-nowrap px-4 py-3 tabular-nums">{diaSemana(p.data)}, {data(p.data)}<span className="block text-xs text-texto-suave">há {diasAtras(p.data)} dia(s)</span></td>
                     <td className="px-4 py-3">
                       <button type="button" className="text-left font-medium hover:text-primaria hover:underline"
                         onClick={() => { const l = todos.find((x) => x.colaborador_id === p.colaborador_id); if (l) abrir(l); }}>{p.colaborador_nome}</button>
                     </td>
                     <td className="px-4 py-3">{p.loja_nome?.replace(/^ÓTICAS IDEALIZE /, "") ?? "—"}</td>
-                    <td className={cx("px-4 py-3", p.tipo === "registro_faltando" || p.tipo === "falta" ? "font-medium text-alerta" : "")}>{TIPO_PEND[p.tipo] ?? p.descricao}</td>
+                    <td className={cx("px-4 py-3", URGENTE(p) ? "font-medium text-perigo" : "text-alerta")}>{TIPO_PEND[p.tipo] ?? p.descricao}</td>
                     <td className="px-4 py-3 text-texto-suave">{p.status ?? "—"}</td>
                   </tr>
                 ))}
@@ -274,7 +395,7 @@ export function BancoHoras() {
           )}
 
           {q.data.sem_vinculo.length > 0 && (
-            <Cartao titulo={`Nomes do VR sem colaborador no RH 360 (${q.data.sem_vinculo.length})`}>
+            <div id="sem-vinculo"><Cartao titulo={`Nomes do VR sem colaborador no RH 360 (${q.data.sem_vinculo.length})`}>
               <p className="mb-3 text-sm text-texto-suave">O nome no VR não bateu com nenhum cadastro (ou bateu com mais de um). Vincule para o saldo aparecer na lista.</p>
               <Tabela cabecalho={["Nome no VR", "Equipe no VR", "Saldo", ""]}>
                 {q.data.sem_vinculo.map((s) => (
@@ -288,7 +409,7 @@ export function BancoHoras() {
                   </tr>
                 ))}
               </Tabela>
-            </Cartao>
+            </Cartao></div>
           )}
         </>
       )}
