@@ -19,7 +19,7 @@ const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; 
   cartao_vr:       { rotulo: "Entrega do cartão VR", icone: CreditCard, como: "Registre a data em que o cartão foi entregue." },
   uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Clique em “Entregar e gerar termo”: as peças saem do estoque, o termo é impresso e o item conclui sozinho." },
   cracha:          { rotulo: "Entrega de crachá", icone: IdCard, como: "Registre a data da entrega (ou lance o crachá na aba Equipamentos)." },
-  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Clique em “Gerar termo”: o item conclui na hora e entra na linha do tempo. Depois anexe o termo assinado." },
+  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Clique em “Gerar e assinar termo”: o termo é impresso para assinatura, o item conclui na hora e entra na linha do tempo. Depois anexe o assinado." },
   equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
 };
 export const ITENS_ADMISSAO = ["cartao_vr", "uniforme", "cracha", "termo_imagem", "equipamento_epi"] as const;
@@ -158,7 +158,7 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                 )}
                 {k === "termo_imagem" && (!it?.concluido || it.origem === "manual") && (
                   <>
-                    <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>{it?.concluido ? "Reimprimir" : "Gerar termo"}</Botao>
+                    <Botao tamanho="sm" variante={it?.concluido ? "secundaria" : "primaria"} icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>{it?.concluido ? "Reimprimir" : "Gerar e assinar termo"}</Botao>
                     {podeAnexar && (
                       <label className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-primaria px-3 text-xs font-medium text-white hover:opacity-90 ${enviando ? "pointer-events-none opacity-60" : ""}`}>
                         <Upload className="size-4" aria-hidden />{enviando ? "Enviando…" : "Anexar termo assinado"}
