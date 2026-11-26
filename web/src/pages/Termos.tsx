@@ -158,6 +158,12 @@ export function GerarTermo({ c, tipoInicial, reimprimir, fechar }: { c: Colabora
       : tipo === "epi" ? termoEpi(dados, itensEpi ?? [])
       : termoImagem(dados);
     imprimir(html, `${TIPOS[tipo!].rotulo} - ${c.nome_completo}`);
+    if (tipo === "imagem") {
+      // gerar o termo de imagem conta como atividade feita (item da admissão + linha do tempo)
+      const { error } = await supabase.rpc("admissao_termo_imagem_gerado", { p_colaborador: c.id });
+      if (error) avisar("erro", mensagemErro(error));
+      else { ["admissao-checklist", "painel-pendencias", "timeline"].forEach((k) => qc.invalidateQueries({ queryKey: [k] })); avisar("sucesso", "Termo gerado e registrado como feito na admissão."); }
+    }
   }
 
   return (

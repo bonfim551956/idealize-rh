@@ -19,7 +19,7 @@ const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; 
   cartao_vr:       { rotulo: "Entrega do cartão VR", icone: CreditCard, como: "Registre a data em que o cartão foi entregue." },
   uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Clique em “Entregar e gerar termo”: as peças saem do estoque, o termo é impresso e o item conclui sozinho." },
   cracha:          { rotulo: "Entrega de crachá", icone: IdCard, como: "Registre a data da entrega (ou lance o crachá na aba Equipamentos)." },
-  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Imprima o termo padrão, colha a assinatura e anexe o termo assinado." },
+  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Clique em “Gerar termo”: o item conclui na hora e entra na linha do tempo. Depois anexe o termo assinado." },
   equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
 };
 export const ITENS_ADMISSAO = ["cartao_vr", "uniforme", "cracha", "termo_imagem", "equipamento_epi"] as const;
@@ -156,9 +156,9 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                     {pode("equipamento.ler", loja) && <Botao tamanho="sm" onClick={() => irPara("equipamentos")}>Tem: registrar entrega</Botao>}
                   </>
                 )}
-                {!it?.concluido && k === "termo_imagem" && (
+                {k === "termo_imagem" && (!it?.concluido || it.origem === "manual") && (
                   <>
-                    <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>Gerar termo</Botao>
+                    <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>{it?.concluido ? "Reimprimir" : "Gerar termo"}</Botao>
                     {podeAnexar && (
                       <label className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-primaria px-3 text-xs font-medium text-white hover:opacity-90 ${enviando ? "pointer-events-none opacity-60" : ""}`}>
                         <Upload className="size-4" aria-hidden />{enviando ? "Enviando…" : "Anexar termo assinado"}

@@ -38,5 +38,12 @@ do $$ begin
   if exists (select 1 from public.status_transicoes where para in ('pre_admissao','em_admissao') or de in ('pre_admissao','em_admissao')) then raise exception 'FALHOU transição de admissão'; end if;
   raise notice 'ok  - sem etapas antes de ativo: cadastro nasce ativo';
 end $$;
+do $$ declare caio uuid := current_setting('teste.caio')::uuid; begin
+  perform public.admissao_termo_imagem_gerado(caio);
+  perform public.admissao_termo_imagem_gerado(caio);
+  if not exists (select 1 from jsonb_array_elements(to_jsonb(public.admissao_checklist(caio))) x where x->>'item' = 'termo_imagem' and (x->>'concluido')::boolean) then raise exception 'FALHOU termo de imagem gerado não concluiu'; end if;
+  if (select count(*) from public.admissao_itens where colaborador_id = caio and item = 'termo_imagem' and not cancelado) <> 1 then raise exception 'FALHOU duplicou item'; end if;
+  raise notice 'ok  - gerar termo de imagem conclui o item (sem duplicar)';
+end $$;
 reset role;
 select 'DESLIGADOS OK';
