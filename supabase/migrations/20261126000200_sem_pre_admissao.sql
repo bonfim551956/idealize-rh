@@ -1,7 +1,8 @@
 -- Fim da etapa "pré-admissão": quem ainda vai começar entra como "em admissão".
 -- (O valor continua no tipo do banco só para o histórico antigo; ninguém mais entra nele.)
 
-delete from public.status_transicoes where de = 'pre_admissao' or para = 'pre_admissao';
+-- ninguém volta para pré-admissão; quem ainda está nela segue o caminho normal (em admissão ou arquivar)
+delete from public.status_transicoes where para = 'pre_admissao';
 
 do $$
 declare d text; n int;
