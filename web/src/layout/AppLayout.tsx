@@ -4,11 +4,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, FileText, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, Shirt, Store, Bus, Palmtree, Timer, Gavel, UserCog, UserX, Users, X } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { cx } from "../ui/componentes";
+import { useModulos } from "../lib/modulos";
 
 type Item = { para: string; rotulo: string; icone: typeof Users; visivel: boolean };
 
 export function AppLayout() {
   const { nome, pode, permissoes, sair } = useAuth();
+  const modulos = useModulos();
   const [menuAberto, setMenuAberto] = useState(false);
   const local = useLocation();
   const leDocumentos = permissoes.some((p) => /^documento\.[a-z]+\.ler$/.test(p.permissao) && p.liberada_na_sessao);
@@ -21,7 +23,7 @@ export function AppLayout() {
     { para: "/uniformes", rotulo: "Uniformes", icone: Shirt, visivel: pode("uniforme.ler") },
     { para: "/ferias", rotulo: "Férias", icone: Palmtree, visivel: pode("colaborador.ler") },
     { para: "/advertencias", rotulo: "Advertências", icone: Gavel, visivel: pode("documento.disciplinar.ler") },
-    { para: "/banco-horas", rotulo: "Banco de horas", icone: Timer, visivel: pode("colaborador.ler") },
+    { para: "/banco-horas", rotulo: "Banco de horas", icone: Timer, visivel: pode("colaborador.ler") && modulos.carregado && modulos.ativo("banco_horas") },
     { para: "/vale-transporte", rotulo: "VT e ausências", icone: Bus, visivel: pode("vt.ler") || pode("ausencia.ler") },
     { para: "/lojas", rotulo: "Lojas e estrutura", icone: Store, visivel: pode("config.estrutura.gerir") },
     { para: "/acessos", rotulo: "Usuários e acessos", icone: UserCog, visivel: pode("acesso.gerir") },

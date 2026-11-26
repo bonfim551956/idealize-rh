@@ -1,5 +1,6 @@
 -- Banco de horas (robô VR)
 begin;
+update privado.modulos set ativo = true where codigo = 'banco_horas'; -- testa com o módulo ligado
 insert into auth.users (email) values ('dir@b108.local'), ('ger@b108.local');
 select privado.bootstrap_diretoria('dir@b108.local');
 update public.usuarios set mfa_obrigatorio = true;

@@ -2,13 +2,11 @@
 # e envia para o Idealize RH 360º. Também pode ser rodado na mão em Actions → "Banco de horas (VR)" → Run workflow.
 name: Banco de horas (VR)
 
+# DESATIVADO em 26/11/2026 (banco de horas desligado no RH 360). Para reativar, volte o agendamento:
+#   schedule:
+#     - cron: "0 12 * * *"   # 12:00 UTC = 09:00 em Brasília
 on:
-  schedule:
-    - cron: "0 12 * * *"   # 12:00 UTC = 09:00 em Brasília
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ["robos/banco-horas/**", ".github/workflows/banco-horas.yml"]
 
 permissions:
   contents: read

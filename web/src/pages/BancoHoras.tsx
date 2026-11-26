@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowUpRight, CheckCircle2, Clock, FileClock, Filter, Li
 import { mensagemErro, supabase } from "../lib/supabase";
 import { useAuth } from "../auth/AuthProvider";
 import { useLojas } from "../lib/dados";
+import { useModulos } from "../lib/modulos";
 import { data } from "../lib/formato";
 import { Aviso, Botao, CabecalhoPagina, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Tabela, cx, useAvisos } from "../ui/componentes";
 
@@ -216,6 +217,13 @@ function ParaCorrigir({ pend, semVinculo, falhou, abrirPessoa, verSemVinculo }: 
 }
 
 export function BancoHoras() {
+  const modulos = useModulos();
+  if (modulos.carregado && !modulos.ativo("banco_horas"))
+    return <EstadoVazio titulo="Banco de horas desativado" descricao="Este módulo foi desligado. Os dados antigos continuam guardados." />;
+  return <BancoHorasAtivo />;
+}
+
+function BancoHorasAtivo() {
   const { pode } = useAuth();
   const lojas = useLojas();
   const [loja, setLoja] = useState("");
