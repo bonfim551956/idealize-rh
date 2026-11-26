@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, CheckCircle2, CircleDashed, CreditCard, FileSignature, HardHat, IdCard, Printer, Shirt, Undo2, Upload, type LucideIcon } from "lucide-react";
-import { chamarFuncao, mensagemErro, supabase } from "../lib/supabase";
+import { BadgeCheck, CheckCircle2, CircleDashed, CreditCard, FileSignature, HardHat, IdCard, Printer, Shirt, Undo2, type LucideIcon } from "lucide-react";
+import { mensagemErro, supabase } from "../lib/supabase";
 import { data, hoje } from "../lib/formato";
-import { useCategorias, type ColaboradorLinha } from "../lib/dados";
+import { type ColaboradorLinha } from "../lib/dados";
 import { useAuth } from "../auth/AuthProvider";
 import { GerarTermo, type TipoTermo } from "./Termos";
 import { AreaTexto, Botao, Campo, Cartao, Carregando, EstadoErro, Modal, Selo, useAvisos } from "../ui/componentes";
@@ -19,7 +19,7 @@ const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; 
   cartao_vr:       { rotulo: "Entrega do cartão VR", icone: CreditCard, como: "Registre a data em que o cartão foi entregue." },
   uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Clique em “Entregar e gerar termo”: as peças saem do estoque, o termo é impresso e o item conclui sozinho." },
   cracha:          { rotulo: "Entrega de crachá", icone: IdCard, como: "Registre a data da entrega (ou lance o crachá na aba Equipamentos)." },
-  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Clique em “Gerar e assinar termo”: o termo é impresso para assinatura, o item conclui na hora e entra na linha do tempo. Depois anexe o assinado." },
+  termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Clique em “Gerar e assinar termo”: o termo é impresso para assinatura, o item conclui na hora e entra na linha do tempo." },
   equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
 };
 export const ITENS_ADMISSAO = ["cartao_vr", "uniforme", "cracha", "termo_imagem", "equipamento_epi"] as const;
@@ -90,11 +90,8 @@ function Desfazer({ id, rotulo, fechar }: { id: string; rotulo: string; fechar: 
 
 export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: (aba: string) => void }) {
   const { pode } = useAuth();
-  const qc = useQueryClient(); const avisar = useAvisos();
-  const categorias = useCategorias();
   const [registrando, setRegistrando] = useState<"cartao_vr" | "cracha" | "epi_nao_tem" | null>(null);
   const [desfazendo, setDesfazendo] = useState<ItemChecklist | null>(null);
-  const [enviando, setEnviando] = useState(false);
   const [termo, setTermo] = useState<TipoTermo | "escolher" | null>(null);
   const q = useChecklistAdmissao(c.id);
   if (q.isLoading) return <Carregando />;
@@ -104,21 +101,6 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
   const feitos = exigidos.filter((k) => mapa.get(k)?.concluido).length;
   const loja = c.loja_atual_id;
   const podeEntregar = pode("equipamento.gerir", loja);
-  const catTermo = categorias.data?.find((k) => k.codigo === "termo_uso_imagem");
-  const podeAnexar = !!catTermo && pode("documento.geral.enviar", loja);
-
-  async function anexarTermo(arquivo: File | undefined) {
-    if (!arquivo || !catTermo) return;
-    setEnviando(true);
-    try {
-      const fd = new FormData();
-      fd.append("arquivo", arquivo);
-      fd.append("meta", JSON.stringify({ categoria_id: catTermo.id, colaborador_id: c.id, nome: "TERMO DE USO DE IMAGEM", data_emissao: hoje() }));
-      await chamarFuncao("documentos-upload", fd, false);
-      qc.invalidateQueries({ queryKey: ["admissao-checklist"] }); qc.invalidateQueries({ queryKey: ["documentos"] }); qc.invalidateQueries({ queryKey: ["painel-pendencias"] });
-      avisar("sucesso", "Termo anexado aos documentos.");
-    } catch (e) { avisar("erro", mensagemErro(e)); } finally { setEnviando(false); }
-  }
 
   return (
     <Cartao titulo={<span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-texto-suave" aria-hidden />Itens obrigatórios da admissão</span>}
@@ -159,13 +141,6 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                 {k === "termo_imagem" && (!it?.concluido || it.origem === "manual") && (
                   <>
                     <Botao tamanho="sm" variante={it?.concluido ? "secundaria" : "primaria"} icone={<Printer className="size-4" />} onClick={() => setTermo("imagem")}>{it?.concluido ? "Reimprimir" : "Gerar e assinar termo"}</Botao>
-                    {podeAnexar && (
-                      <label className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg bg-primaria px-3 text-xs font-medium text-white hover:opacity-90 ${enviando ? "pointer-events-none opacity-60" : ""}`}>
-                        <Upload className="size-4" aria-hidden />{enviando ? "Enviando…" : "Anexar termo assinado"}
-                        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="sr-only" disabled={enviando}
-                          onChange={(e) => { anexarTermo(e.target.files?.[0]); e.target.value = ""; }} />
-                      </label>
-                    )}
                   </>
                 )}
                 {k === "uniforme" && it?.concluido && (
