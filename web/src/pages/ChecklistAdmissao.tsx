@@ -23,6 +23,8 @@ const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; 
   equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
 };
 export const ITENS_ADMISSAO = ["cartao_vr", "uniforme", "cracha", "termo_imagem", "equipamento_epi"] as const;
+/* crachá só é pedido depois da experiência: enquanto o contrato for de experiência ele não conta como pendente */
+export const itensExigidos = (tipo: string | null) => ITENS_ADMISSAO.filter((k) => !(k === "cracha" && tipo === "clt_experiencia"));
 
 export function useChecklistAdmissao(colaboradorId: string | undefined) {
   return useQuery({
@@ -98,7 +100,8 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
   if (q.isLoading) return <Carregando />;
   if (q.error) return <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} />;
   const mapa = new Map(q.data!.map((i) => [i.item, i]));
-  const feitos = ITENS_ADMISSAO.filter((k) => mapa.get(k)?.concluido).length;
+  const exigidos = itensExigidos(c.tipo);
+  const feitos = exigidos.filter((k) => mapa.get(k)?.concluido).length;
   const loja = c.loja_atual_id;
   const podeEntregar = pode("equipamento.gerir", loja);
   const catTermo = categorias.data?.find((k) => k.codigo === "termo_uso_imagem");
@@ -119,23 +122,25 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
 
   return (
     <Cartao titulo={<span className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-texto-suave" aria-hidden />Itens obrigatórios da admissão</span>}
-      acao={<Selo tom={feitos === ITENS_ADMISSAO.length ? "sucesso" : "alerta"}>{feitos} de {ITENS_ADMISSAO.length} concluídos</Selo>}>
-      <div className="mb-4 h-2 overflow-hidden rounded-full bg-fundo" role="progressbar" aria-valuenow={feitos} aria-valuemin={0} aria-valuemax={ITENS_ADMISSAO.length}>
-        <div className="h-full rounded-full bg-primaria transition-all" style={{ width: `${(feitos / ITENS_ADMISSAO.length) * 100}%` }} />
+      acao={<Selo tom={feitos === exigidos.length ? "sucesso" : "alerta"}>{feitos} de {exigidos.length} concluídos</Selo>}>
+      <div className="mb-4 h-2 overflow-hidden rounded-full bg-fundo" role="progressbar" aria-valuenow={feitos} aria-valuemin={0} aria-valuemax={exigidos.length}>
+        <div className="h-full rounded-full bg-primaria transition-all" style={{ width: `${(feitos / exigidos.length) * 100}%` }} />
       </div>
       <ul className="flex flex-col divide-y divide-borda">
         {ITENS_ADMISSAO.map((k) => {
           const it = mapa.get(k); const def = ITENS[k]; const Icone = def.icone;
+          const espera = !it?.concluido && !exigidos.includes(k);
           return (
             <li key={k} className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center">
-              <span className={`inline-flex size-10 shrink-0 items-center justify-center rounded-full ${it?.concluido ? "bg-sucesso-suave text-sucesso" : "bg-alerta-suave text-alerta"}`}>
+              <span className={`inline-flex size-10 shrink-0 items-center justify-center rounded-full ${it?.concluido ? "bg-sucesso-suave text-sucesso" : espera ? "bg-fundo text-texto-suave" : "bg-alerta-suave text-alerta"}`}>
                 <Icone className="size-5" aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 font-medium">{def.rotulo}
-                  {it?.concluido ? <CheckCircle2 className="size-4 text-sucesso" aria-label="Concluído" /> : <CircleDashed className="size-4 text-alerta" aria-label="Pendente" />}</p>
+                  {it?.concluido ? <CheckCircle2 className="size-4 text-sucesso" aria-label="Concluído" /> : espera ? <span className="rounded-full border border-borda px-2 py-0.5 text-xs font-normal text-texto-suave">Depois da experiência</span> : <CircleDashed className="size-4 text-alerta" aria-label="Pendente" />}</p>
                 <p className="text-sm text-texto-suave">
-                  {it?.concluido ? <>Em {data(it.data)}{it.por ? ` · por ${it.por}` : ""}{it.detalhe ? ` · ${it.detalhe}` : ""}</> : def.como}
+                  {it?.concluido ? <>Em {data(it.data)}{it.por ? ` · por ${it.por}` : ""}{it.detalhe ? ` · ${it.detalhe}` : ""}</>
+                    : espera ? "O crachá só é pedido quando a pessoa passa do período de experiência. Vira pendência ao efetivar." : def.como}
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">

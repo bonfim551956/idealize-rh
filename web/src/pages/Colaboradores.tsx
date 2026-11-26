@@ -53,7 +53,7 @@ export function Colaboradores() {
           <Selecao rotulo="Situação" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="vigentes">Vínculos vigentes</option>
             <option value="">Todos</option>
-            {Object.entries(STATUS_VINCULO).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
+            {Object.entries(STATUS_VINCULO).filter(([k]) => k !== "pre_admissao").map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
           </Selecao>
         </div>
 
@@ -158,7 +158,7 @@ export function NovoColaborador() {
         if (k === "loja_id" && !lojasDisponiveis.some((l) => l.id === v)) continue;
         n[k] = v; novos.add(k);
       }
-      if (r.dados.data_admissao && r.dados.data_admissao > hoje()) n.status_inicial = "pre_admissao";
+      if (r.dados.data_admissao && r.dados.data_admissao > hoje()) n.status_inicial = "em_admissao";
       return n as typeof s;
     });
     setLidos(novos); setLeitura(r); setFicha(arquivo);
@@ -224,7 +224,7 @@ export function NovoColaborador() {
     if (!f.loja_id) er.loja_id = "Escolha a loja";
     if (!f.matricula.trim()) er.matricula = "Informe a matrícula";
     if (f.status_inicial === "ativo" && !f.data_admissao) er.data_admissao = "Obrigatória para colaborador já contratado";
-    if (f.data_admissao && f.data_admissao > hoje() && f.status_inicial === "ativo") er.data_admissao = "Data no futuro: use pré-admissão";
+    if (f.data_admissao && f.data_admissao > hoje() && f.status_inicial === "ativo") er.data_admissao = "Data no futuro: use \"Em admissão\"";
     if (f.salario_base && !(Number(f.salario_base) > 0)) er.salario_base = "Valor inválido";
     setErros(er);
     if (Object.keys(er).length === 0) salvar.mutate();
@@ -290,7 +290,7 @@ export function NovoColaborador() {
             <Selecao rotulo="Situação inicial" value={f.status_inicial} onChange={set("status_inicial")}
               dica={f.status_inicial === "ativo" ? "Para quem já trabalha na empresa (carga inicial)." : "Para quem ainda vai ser contratado."}>
               <option value="ativo">Já contratado (ativo)</option>
-              <option value="pre_admissao">Pré-admissão</option>
+              <option value="em_admissao">Em admissão (ainda vai começar)</option>
             </Selecao>
             <Campo rotulo="Data de admissão" type="date" value={f.data_admissao} onChange={set("data_admissao")} erro={erros.data_admissao} dica={marca("data_admissao")} obrigatorio={f.status_inicial === "ativo"} />
             <Selecao rotulo="Cargo" value={f.cargo_id} onChange={set("cargo_id")} dica={marca("cargo_id")}>

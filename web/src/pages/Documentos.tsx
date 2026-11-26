@@ -26,7 +26,7 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
   const categorias = useCategorias();
   const qc = useQueryClient();
   const avisar = useAvisos();
-  const [filtro, setFiltro] = useState({ loja: "", categoria: "", status: "" });
+  const [filtro, setFiltro] = useState({ loja: "", categoria: "", status: "", quem: "vigentes" });
   const [envio, setEnvio] = useState<{ aberto: boolean; documento?: DocumentoLinha }>({ aberto: false });
   const [conferindo, setConferindo] = useState<DocumentoLinha | null>(null);
   const [arquivando, setArquivando] = useState<DocumentoLinha | null>(null);
@@ -42,6 +42,15 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
       return falhar(await r) as DocumentoLinha[];
     },
   });
+
+  // desligados ficam na tela Desligados; aqui só aparecem se pedir (ou se ainda faltam conferir)
+  const desligados = useQuery({
+    queryKey: ["ids-desligados"], enabled: !colaborador,
+    queryFn: async () => new Set((falhar(await supabase.from("v_colaboradores").select("id").eq("status", "desligado")) as { id: string }[]).map((x) => x.id)),
+  });
+  const visiveis = (q.data ?? []).filter((d) => colaborador || filtro.quem === "todos" || !d.colaborador_id || !desligados.data
+    || (filtro.quem === "desligados") === desligados.data.has(d.colaborador_id)
+    || (filtro.quem === "vigentes" && ["recebido", "em_conferencia"].includes(d.status)));
 
   const podeEnviarAlgo = permissoes.some((p) => /^documento\.[a-z]+\.enviar$/.test(p.permissao) && p.liberada_na_sessao);
 
@@ -64,7 +73,7 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
       acao={podeEnviarAlgo && (colaborador || !colaborador) &&
         <Botao tamanho="sm" icone={<FilePlus2 className="size-4" />} onClick={() => setEnvio({ aberto: true })}>Enviar documento</Botao>}>
       {!colaborador && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Selecao rotulo="Loja" value={filtro.loja} onChange={(e) => setFiltro((f) => ({ ...f, loja: e.target.value }))}>
             <option value="">Todas</option>
             {lojas.data?.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
@@ -77,15 +86,21 @@ export function ListaDocumentos({ colaborador }: { colaborador?: ColaboradorLinh
             <option value="">Todos</option>
             {Object.entries(STATUS_DOCUMENTO).map(([k, v]) => <option key={k} value={k}>{v.rotulo}</option>)}
           </Selecao>
+          <Selecao rotulo="Colaboradores" value={filtro.quem} onChange={(e) => setFiltro((f) => ({ ...f, quem: e.target.value }))}
+            dica={filtro.quem === "vigentes" ? "Arquivos de desligados ficam na tela Desligados." : undefined}>
+            <option value="vigentes">Na empresa</option>
+            <option value="desligados">Desligados</option>
+            <option value="todos">Todos</option>
+          </Selecao>
         </div>
       )}
 
       {q.isLoading && <Carregando />}
       {q.error && <EstadoErro mensagem={(q.error as Error).message} tentarNovamente={() => q.refetch()} />}
-      {q.data?.length === 0 && <EstadoVazio titulo="Nenhum documento" descricao="Você só vê as categorias permitidas para o seu perfil." />}
-      {!!q.data?.length && (
+      {q.data && visiveis.length === 0 && <EstadoVazio titulo="Nenhum documento" descricao="Você só vê as categorias permitidas para o seu perfil." />}
+      {visiveis.length > 0 && (
         <Tabela cabecalho={colaborador ? ["Documento", "Categoria", "Vencimento", "Status", ""] : ["Documento", "Colaborador", "Categoria", "Vencimento", "Status", ""]}>
-          {q.data.map((d) => {
+          {visiveis.map((d) => {
             const vencido = d.vencimento && d.vencimento < hoje() && d.status !== "arquivado";
             return (
               <tr key={d.id} className="hover:bg-fundo">

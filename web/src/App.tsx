@@ -8,6 +8,7 @@ import { Painel } from "./pages/Painel";
 import { Colaboradores, NovoColaborador } from "./pages/Colaboradores";
 import { Ficha } from "./pages/Ficha";
 import { PaginaDocumentos } from "./pages/Documentos";
+import { Desligados } from "./pages/Desligados";
 import { Acessos, Auditoria, Conta, Lojas, Perfis } from "./pages/Admin";
 import { Manual } from "./pages/Manual";
 import { Uniformes } from "./pages/Uniformes";
@@ -56,6 +57,7 @@ export function App() {
         <Route path="uniformes" element={<Requer perm="uniforme.ler"><Uniformes /></Requer>} />
         <Route path="ferias" element={<Requer perm="colaborador.ler"><Ferias /></Requer>} />
         <Route path="advertencias" element={<Requer perm="documento.disciplinar.ler"><Advertencias /></Requer>} />
+        <Route path="desligados" element={<Requer perm="colaborador.ler"><Desligados /></Requer>} />
         <Route path="banco-horas" element={<Requer perm="colaborador.ler"><BancoHoras /></Requer>} />
         <Route path="vale-transporte" element={<Requer perm={(p) => p("vt.ler") || p("ausencia.ler")}><ValeTransporte /></Requer>} />
         <Route path="lojas" element={<Requer perm="config.estrutura.gerir"><Lojas /></Requer>} />

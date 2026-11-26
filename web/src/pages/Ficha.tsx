@@ -13,7 +13,7 @@ import { ListaDocumentos } from "./Documentos";
 import { UniformesColaborador } from "./Uniformes";
 import { EquipamentosColaborador } from "./Equipamentos";
 import { FichaCompleta } from "./FichaCompleta";
-import { ChecklistAdmissao, ITENS_ADMISSAO, useChecklistAdmissao } from "./ChecklistAdmissao";
+import { ChecklistAdmissao, itensExigidos, useChecklistAdmissao } from "./ChecklistAdmissao";
 
 type Evento = { id: string; tipo: string; data_evento: string; titulo: string; descricao: string | null; sigilo: string; origem: string; registrado_em: string };
 
@@ -39,7 +39,7 @@ export function Ficha() {
 
   const abas: { valor: string; rotulo: string; visivel: boolean; conteudo: ReactNode }[] = [
     { valor: "geral", rotulo: "Visão geral", visivel: true, conteudo: <VisaoGeral c={c} /> },
-    { valor: "admissao", rotulo: checklist.data ? `Admissão (${checklist.data.filter((i) => i.concluido).length}/${ITENS_ADMISSAO.length})` : "Admissão",
+    { valor: "admissao", rotulo: checklist.data ? `Admissão (${itensExigidos(c.tipo).filter((k) => checklist.data!.find((i) => i.item === k)?.concluido).length}/${itensExigidos(c.tipo).length})` : "Admissão",
       visivel: !!c.status && !["desligado", "arquivado", "em_desligamento"].includes(c.status), conteudo: <ChecklistAdmissao c={c} irPara={irPara} /> },
     { valor: "historico", rotulo: "Movimentações", visivel: true, conteudo: <Historico c={c} /> },
     { valor: "documentos", rotulo: "Documentos", visivel: true, conteudo: <ListaDocumentos colaborador={c} /> },
@@ -334,7 +334,7 @@ function MudarSalario({ c, fechar }: { c: ColaboradorLinha; fechar: () => void }
   );
 }
 
-const MODALIDADES = [
+export const MODALIDADES = [
   ["pedido_demissao", "Pedido de demissão"], ["sem_justa_causa", "Dispensa sem justa causa"], ["justa_causa", "Dispensa por justa causa"],
   ["acordo", "Acordo entre as partes"], ["termino_experiencia", "Término do contrato de experiência"],
   ["termino_prazo_determinado", "Término de contrato por prazo determinado"], ["outra", "Outra"],
