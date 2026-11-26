@@ -34,9 +34,9 @@ select public.cadastrar_colaborador(jsonb_build_object('nome_completo','Caio Nov
   'tipo','clt_prazo_indeterminado','status_inicial','pre_admissao','data_admissao', current_date + 10)) as caio \gset
 select set_config('teste.caio', :'caio', true);
 do $$ begin
-  if (select status from public.vinculos where colaborador_id = current_setting('teste.caio')::uuid) <> 'em_admissao' then raise exception 'FALHOU pré-admissão não virou em admissão'; end if;
-  if exists (select 1 from public.status_transicoes where para = 'pre_admissao') then raise exception 'FALHOU transição para pré-admissão'; end if;
-  raise notice 'ok  - pré-admissão extinta: cadastro nasce em admissão';
+  if (select status from public.vinculos where colaborador_id = current_setting('teste.caio')::uuid) <> 'ativo' then raise exception 'FALHOU cadastro não nasceu ativo'; end if;
+  if exists (select 1 from public.status_transicoes where para in ('pre_admissao','em_admissao') or de in ('pre_admissao','em_admissao')) then raise exception 'FALHOU transição de admissão'; end if;
+  raise notice 'ok  - sem etapas antes de ativo: cadastro nasce ativo';
 end $$;
 reset role;
 select 'DESLIGADOS OK';

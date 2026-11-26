@@ -2,13 +2,13 @@
  * Dados pessoais (CPF, RG, endereço) vêm da ficha; o que não é pessoal (itens entregues, CA do EPI,
  * acessórios, estado, tipo de entrega) é conferido/completado aqui por quem cuida do RH antes de imprimir. */
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, HardHat, Laptop, Plus, Printer, Shirt, Trash2, type LucideIcon } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useEmpresas, useLojas, type ColaboradorLinha } from "../lib/dados";
 import { data as dataBR, hoje } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
-import { Aviso, Botao, Campo, Carregando, Modal, cx } from "../ui/componentes";
+import { Aviso, Botao, Campo, Carregando, Modal, Selecao, cx, useAvisos } from "../ui/componentes";
 
 export type TipoTermo = "imagem" | "uniforme" | "equipamento" | "epi";
 
@@ -73,6 +73,17 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
   const [itensUni, setItensUni] = useState<Linha[] | null>(null);
   const [dataUni, setDataUni] = useState<string>("");
   const [renovUni, setRenovUni] = useState<string>("");
+  // nova entrega: as peças saem do estoque, ficam em posse do colaborador, concluem o item da admissão e vão para a linha do tempo
+  const podeEntregar = pode("uniforme.movimentar", loja);
+  const [modoUni, setModoUni] = useState<"nova" | "reimprimir">(podeEntregar ? "nova" : "reimprimir");
+  const [novas, setNovas] = useState<{ item_id: string; qtd: string; estado: string }[]>([{ item_id: "", qtd: "1", estado: "NOVO" }]);
+  const [gravando, setGravando] = useState(false);
+  const qc = useQueryClient(); const avisar = useAvisos();
+  const estoque = useQuery({
+    queryKey: ["uniformes", "estoque"], enabled: tipo === "uniforme" && podeEntregar,
+    queryFn: async () => falhar(await supabase.from("v_uniformes_estoque").select("*").order("grupo").order("peca").order("tamanho")) as
+      { id: string; peca: string; tamanho: string; grupo: string; saldo: number; ativo: boolean }[],
+  });
   // equipamento / EPI
   const [itensEq, setItensEq] = useState<Linha[] | null>(null);
   const [outroEq, setOutroEq] = useState("");
@@ -103,14 +114,45 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
   const local = lj?.cidade ? `${lj.cidade}${lj.uf ? `/${lj.uf}` : ""}` : "";
   const faltaPessoal = !f.completo;
 
-  function gerar() {
-    const dados: DadosTermo = {
-      nome: c.nome_completo, cpf, cargo: c.cargo_nome ?? "", loja: lj?.nome ?? c.loja_nome ?? "", admissao: c.data_admissao ? dataBR(c.data_admissao) : "",
-      rg: [f.rg, f.rg_orgao].filter(Boolean).join(" / "),
-      endereco: [f.logradouro, f.numero, f.complemento, f.bairro].filter(Boolean).join(", "),
-      cepCidade: [f.cep, [f.cidade, f.uf].filter(Boolean).join("/")].filter(Boolean).join(" · "),
-      empresa: emp?.razao_social ?? "", cnpj: cnpjFmt(emp?.cnpj), local, dataTermo,
-    };
+  const dadosTermo = (): DadosTermo => ({
+    nome: c.nome_completo, cpf, cargo: c.cargo_nome ?? "", loja: lj?.nome ?? c.loja_nome ?? "", admissao: c.data_admissao ? dataBR(c.data_admissao) : "",
+    rg: [f.rg, f.rg_orgao].filter(Boolean).join(" / "),
+    endereco: [f.logradouro, f.numero, f.complemento, f.bairro].filter(Boolean).join(", "),
+    cepCidade: [f.cep, [f.cidade, f.uf].filter(Boolean).join("/")].filter(Boolean).join(" · "),
+    empresa: emp?.razao_social ?? "", cnpj: cnpjFmt(emp?.cnpj), local, dataTermo,
+  });
+  useEffect(() => { if (modoUni === "nova" && itensUni !== null) { setDataUni(hoje()); setRenovUni(somaMeses(hoje(), 8)); } }, [modoUni, itensUni === null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const errosNovas = novas.map((l) => {
+    const it = estoque.data?.find((x) => x.id === l.item_id); const q = Number(l.qtd);
+    if (!l.item_id) return null;
+    if (!Number.isInteger(q) || q < 1) return "Quantidade inválida";
+    if (it && q > it.saldo) return `Só há ${it.saldo} em estoque`;
+    return null;
+  });
+  const novaValida = novas.some((l) => l.item_id) && errosNovas.every((e) => !e) && new Set(novas.filter((l) => l.item_id).map((l) => l.item_id)).size === novas.filter((l) => l.item_id).length
+    && !!dataUni && dataUni <= hoje();
+
+  async function gerar() {
+    if (tipo === "uniforme" && modoUni === "nova") {
+      const janela = window.open("", "_blank"); // abre já, senão o navegador bloqueia depois da espera
+      setGravando(true);
+      try {
+        const sel = novas.filter((l) => l.item_id);
+        const rotuloTipo: Record<string, string> = { onboarding: "ONBOARDING", kit_definitivo: "KIT DEFINITIVO", kit_montagem: "KIT MONTAGEM", renovacao: "RENOVAÇÃO / REPOSIÇÃO" };
+        const { error } = await supabase.rpc("uniforme_movimentar", {
+          p_tipo: "saida", p_itens: sel.map((l) => ({ item_id: l.item_id, quantidade: Number(l.qtd) })),
+          p_colaborador: c.id, p_data: dataUni, p_observacao: `TERMO DE RECEBIMENTO GERADO · ${rotuloTipo[tipoUni] ?? ""}`,
+        });
+        if (error) throw error;
+        ["uniformes", "admissao-checklist", "painel-pendencias", "timeline"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+        const linhas = sel.map((l) => { const it = estoque.data!.find((x) => x.id === l.item_id)!; return { item: it.peca, tamanho: it.tamanho, qtd: l.qtd, estado: l.estado }; });
+        imprimir(termoUniforme(dadosTermo(), tipoUni, linhas, dataUni, renovUni), `${TIPOS.uniforme.rotulo} - ${c.nome_completo}`, janela);
+        avisar("sucesso", "Entrega registrada: baixa no estoque, item da admissão e linha do tempo atualizados.");
+        fechar();
+      } catch (e) { janela?.close(); avisar("erro", mensagemErro(e)); } finally { setGravando(false); }
+      return;
+    }
+    const dados = dadosTermo();
     const html = tipo === "uniforme" ? termoUniforme(dados, tipoUni, itensUni ?? [], dataUni, renovUni)
       : tipo === "equipamento" ? termoEquipamento(dados, itensEq ?? [], outroEq)
       : tipo === "epi" ? termoEpi(dados, itensEpi ?? [])
@@ -131,7 +173,7 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
             </button>); })}
         </div>
       ) : carregando ? <Carregando /> : (
-        <form onSubmit={(e) => { e.preventDefault(); gerar(); }} className="flex flex-col gap-4">
+        <form onSubmit={(e) => { e.preventDefault(); void gerar(); }} className="flex flex-col gap-4">
           <div className="rounded-lg bg-fundo p-3 text-sm">
             <p className="mb-1 text-xs font-medium uppercase text-texto-suave">Vem da ficha</p>
             <p>{c.nome_completo} · CPF {cpf || "—"} · {c.cargo_nome ?? "sem cargo"} · {c.loja_nome} · admissão {c.data_admissao ? dataBR(c.data_admissao) : "—"}</p>
@@ -150,11 +192,45 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
                   </label>
                 ))}
               </fieldset>
-              <EditorLinhas titulo="Itens recebidos" linhas={itensUni} setLinhas={setItensUni}
-                colunas={[["item", "Item", "flex-[3]"], ["tamanho", "Tamanho", "flex-1"], ["qtd", "Qtd.", "w-16"], ["estado", "Estado", "flex-1"]]}
-                nova={{ item: "", tamanho: "", qtd: "1", estado: "NOVO" }} />
+              {podeEntregar && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {([["nova", "Nova entrega", "Dá baixa no estoque, conclui o item da admissão e registra na linha do tempo"],
+                     ["reimprimir", "Só imprimir de novo", "Peças que já foram entregues; não mexe no estoque"]] as const).map(([v, t, d]) => (
+                    <label key={v} className={cx("flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 text-sm", modoUni === v ? "border-primaria bg-primaria-suave" : "border-borda")}>
+                      <input type="radio" name="modoUni" checked={modoUni === v} onChange={() => setModoUni(v)} className="mt-1 accent-[var(--color-primaria)]" />
+                      <span><span className="block font-medium">{t}</span><span className="text-xs text-texto-suave">{d}</span></span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {modoUni === "nova" ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm font-medium">Peças entregues agora (saem do estoque)</p>
+                  {estoque.isLoading && <Carregando />}
+                  {novas.map((l, n) => (
+                    <div key={n} className="grid grid-cols-[1fr_80px_120px_auto] items-start gap-2">
+                      <Selecao rotulo={n === 0 ? "Peça e tamanho" : " "} value={l.item_id} erro={errosNovas[n] ?? undefined}
+                        onChange={(e) => setNovas(novas.map((x, k) => k === n ? { ...x, item_id: e.target.value } : x))}>
+                        <option value="">Selecione</option>
+                        {(estoque.data ?? []).filter((i) => i.ativo && (i.saldo > 0 || i.id === l.item_id)).map((i) => (
+                          <option key={i.id} value={i.id}>{i.grupo} · {i.peca} · {i.tamanho} (estoque: {i.saldo})</option>))}
+                      </Selecao>
+                      <Campo rotulo={n === 0 ? "Qtd." : " "} type="number" min={1} value={l.qtd} onChange={(e) => setNovas(novas.map((x, k) => k === n ? { ...x, qtd: e.target.value } : x))} />
+                      <Campo rotulo={n === 0 ? "Estado" : " "} value={l.estado} onChange={(e) => setNovas(novas.map((x, k) => k === n ? { ...x, estado: e.target.value } : x))} />
+                      <button type="button" aria-label="Remover peça" disabled={novas.length === 1} onClick={() => setNovas(novas.filter((_, k) => k !== n))}
+                        className={cx("rounded-lg p-2 text-texto-suave hover:bg-perigo-suave hover:text-perigo disabled:opacity-40", n === 0 && "mt-7")}><Trash2 className="size-4" /></button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setNovas([...novas, { item_id: "", qtd: "1", estado: "NOVO" }])}
+                    className="inline-flex items-center gap-1 self-start text-sm font-medium text-primaria hover:underline"><Plus className="size-4" />Adicionar peça</button>
+                </div>
+              ) : (
+                <EditorLinhas titulo="Itens recebidos" linhas={itensUni} setLinhas={setItensUni}
+                  colunas={[["item", "Item", "flex-[3]"], ["tamanho", "Tamanho", "flex-1"], ["qtd", "Qtd.", "w-16"], ["estado", "Estado", "flex-1"]]}
+                  nova={{ item: "", tamanho: "", qtd: "1", estado: "NOVO" }} />
+              )}
               <div className="grid grid-cols-2 gap-3">
-                <Campo rotulo="Data desta entrega" type="date" value={dataUni} onChange={(e) => { setDataUni(e.target.value); if (e.target.value) setRenovUni(somaMeses(e.target.value, 8)); }} />
+                <Campo rotulo="Data desta entrega" type="date" max={modoUni === "nova" ? hoje() : undefined} value={dataUni} onChange={(e) => { setDataUni(e.target.value); if (e.target.value) setRenovUni(somaMeses(e.target.value, 8)); }} />
                 <Campo rotulo="Próxima renovação (+8 meses)" type="date" value={renovUni} onChange={(e) => setRenovUni(e.target.value)} />
               </div>
             </>
@@ -185,7 +261,8 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
             {!tipoInicial ? <Botao type="button" variante="fantasma" onClick={() => setTipo(null)}>Trocar termo</Botao> : <span />}
             <div className="flex gap-2">
               <Botao type="button" variante="secundaria" onClick={fechar}>Cancelar</Botao>
-              <Botao type="submit" icone={<Printer className="size-4" />}>Gerar e imprimir</Botao>
+              <Botao type="submit" carregando={gravando} disabled={tipo === "uniforme" && modoUni === "nova" && !novaValida} icone={<Printer className="size-4" />}>
+                {tipo === "uniforme" && modoUni === "nova" ? "Registrar entrega e imprimir" : "Gerar e imprimir"}</Botao>
             </div>
           </div>
           <p className="text-xs text-texto-suave">Depois de assinado, anexe o termo em Documentos (ou no item da admissão) para ficar guardado na ficha.</p>
@@ -363,8 +440,8 @@ function termoImagem(d: DadosTermo) {
   "Lei nº 9.610/1998 (Direitos Autorais) &nbsp;|&nbsp; Lei nº 13.709/2018 (LGPD)");
 }
 
-export function imprimir(html: string, titulo: string) {
-  const w = window.open("", "_blank");
+export function imprimir(html: string, titulo: string, janela?: Window | null) {
+  const w = janela ?? window.open("", "_blank");
   if (!w) { alert("Libere as janelas pop-up deste site para gerar o termo."); return; }
   w.document.open(); w.document.write(html); w.document.title = titulo; w.document.close();
 }

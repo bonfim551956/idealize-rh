@@ -184,7 +184,6 @@ const SECOES: Secao[] = [
           ["Documentos vencidos / vencendo em 30 dias", "Documentos com vencimento (ex.: ASO) passado ou próximo, sem uma versão mais nova enviada."],
           ["Férias a vencer", "Saldo de férias com prazo terminando nos próximos 90 dias (urgente se já venceu)."],
           ["Desligamentos em andamento", "Desligamentos iniciados e ainda não concluídos."],
-          ["Admissões em aberto", "Cadastros em pré-admissão ou em admissão."],
           ["Equipamentos sem termo assinado", "Equipamentos entregues sem o termo anexado."],
           ["Devoluções pendentes", "Desligados que ainda estão com equipamento ou uniforme em mãos (urgente)."],
           ["Sem cadastro de vale-transporte", "Colaboradores ativos sem informar se recebem VT e o valor."],
@@ -228,8 +227,6 @@ const SECOES: Secao[] = [
         ]} />
         <T>Situações do vínculo</T>
         <Quadro cabecalho={["Situação", "Significado"]} linhas={[
-          [<Selo tom="info">Pré-admissão</Selo>, "Contratação em andamento; ainda não começou a trabalhar."],
-          [<Selo tom="info">Em admissão</Selo>, "Documentos e procedimentos de admissão em curso."],
           [<Selo tom="sucesso">Ativo</Selo>, "Trabalhando normalmente."],
           [<Selo>Em férias</Selo>, "Em gozo de férias."],
           [<Selo tom="alerta">Afastado</Selo>, "Afastamento (ex.: atestado, INSS)."],
@@ -244,7 +241,7 @@ const SECOES: Secao[] = [
   },
   {
     id: "cadastrar", titulo: "Cadastrar colaborador", icone: UserPlus, grupo: "Pessoas",
-    palavras: "novo cadastro cadastrar admissão ficha de admissão leitura automática pré-admissão contratado matrícula cpf tipo vínculo jornada escala salário",
+    palavras: "novo cadastro cadastrar admissão ficha de admissão leitura automática contratado matrícula cpf tipo vínculo jornada escala salário",
     mostrar: (c) => c.pode("colaborador.criar"),
     conteudo: (c) => (
       <>
@@ -253,14 +250,9 @@ const SECOES: Secao[] = [
           <><B>Itens obrigatórios</B>: depois de cadastrar, vá à seção <Menu>Admissão</Menu> da ficha e conclua os 5 itens — cartão VR e crachá com <Menu>Registrar entrega</Menu>; uniforme e equipamento/EPI pelas abas Uniformes e Equipamentos (concluem sozinhos) — se a função não usa EPI, clique em <Menu>Não tem</Menu> no item de equipamento/EPI; termo de uso de imagem com <Menu>Imprimir termo</Menu> e depois <Menu>Anexar termo assinado</Menu>.</>,
           <><B>Pela ficha de admissão (opcional)</B>: clique em <Menu>Enviar ficha</Menu> e escolha o PDF ou a foto da ficha. A leitura automática preenche o formulário e marca com ✓ cada campo lido. Confira tudo, complete o que faltar (ex.: matrícula) e só então cadastre. A ficha é anexada aos documentos do colaborador.</>,
           <><B>Dados pessoais</B>: nome completo e CPF são obrigatórios. Nome social só se a pessoa usar. Endereço e contato de emergência podem ser preenchidos depois, na ficha.</>,
-          <><B>Vínculo</B>: escolha a loja, a matrícula, o tipo de vínculo e a situação inicial (veja abaixo).</>,
+          <><B>Vínculo</B>: escolha a loja, a matrícula, o tipo de vínculo e a data de admissão. Todo cadastro já entra como <B>ativo</B> a partir dessa data.</>,
           <>Preencha cargo, jornada semanal e escala.{c.pode("remuneracao.gerir") && <> Se for o caso, informe o <B>salário contratual</B>.</>}</>,
           <>Clique em <Menu>Cadastrar</Menu>. O sistema abre a ficha do colaborador recém-criado.</>,
-        ]} />
-        <T>Situação inicial: qual escolher?</T>
-        <Quadro cabecalho={["Opção", "Quando usar", "Data de admissão"]} linhas={[
-          [<B>Já contratado (ativo)</B>, "Para cadastrar quem já trabalha na empresa (carga inicial da equipe).", "Obrigatória, não pode ser futura."],
-          [<B>Pré-admissão</B>, "Para quem ainda vai começar.", "Opcional (prevista)."],
         ]} />
         <T>Regras que o sistema confere</T>
         <Lista itens={[
@@ -325,8 +317,6 @@ const SECOES: Secao[] = [
         ]} />
         <T>Mudanças permitidas</T>
         <Quadro cabecalho={["De", "Para"]} linhas={[
-          ["Pré-admissão", "Em admissão · Arquivado (desistência)"],
-          ["Em admissão", "Ativo (início do trabalho) · Pré-admissão · Arquivado"],
           ["Ativo", "Em férias · Afastado · Em licença · Em desligamento (pelo botão próprio)"],
           ["Em férias", "Ativo (retorno)"],
           ["Afastado / Em licença", "Ativo (retorno) · Em desligamento"],
@@ -346,7 +336,7 @@ const SECOES: Secao[] = [
       <>
         <Passos itens={[
           <>Na ficha, em <B>Ações</B>, clique em <Menu>Editar dados do vínculo</Menu>.</>,
-          <>Ajuste jornada semanal e escala. Enquanto o colaborador estiver em pré-admissão ou em admissão, também dá para ajustar a data de admissão prevista.</>,
+          <>Ajuste jornada semanal e escala.</>,
         ]} />
         <Dica>Loja, cargo, salário e situação não são editados aqui: cada um tem sua ação própria, que guarda o histórico.</Dica>
       </>
@@ -599,6 +589,7 @@ const SECOES: Secao[] = [
     conteudo: () => (
       <>
         <P>Na ficha, em <B>Ações</B>, clique em <Menu>Gerar termo</Menu> e escolha: recebimento de uniforme, entrega e responsabilidade de EPI, recebimento de equipamento ou autorização de uso de imagem e voz. Também dá para gerar direto pelos itens da seção <Menu>Admissão</Menu>.</P>
+        <P>No termo de <B>uniforme</B>, escolha <B>Nova entrega</B> e as peças do estoque: ao clicar em <Menu>Registrar entrega e imprimir</Menu> o sistema dá baixa no estoque, as peças ficam em posse do colaborador, o item "Entrega de uniforme" da admissão fica concluído e a entrega entra na linha do tempo. Para peças já entregues, use <B>Só imprimir de novo</B> (não mexe no estoque).</P>
         <P>Nome, CPF, cargo, loja, admissão, RG, endereço e empresa vêm da ficha. Antes de imprimir, confira o que não é pessoal: tipo de entrega e peças do uniforme, nº do CA e validade do EPI, patrimônio, acessórios e estado dos equipamentos. Dá para acrescentar ou tirar linhas.</P>
         <P>Clique em <Menu>Gerar e imprimir</Menu>: o termo abre no modelo oficial, pronto para imprimir ou salvar em PDF. Depois de assinado, anexe em Documentos (ou no item da admissão).</P>
         <Dica>Quem não vê dados pessoais gera o termo com CPF, RG e endereço em branco, para preencher à mão.</Dica>
