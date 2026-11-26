@@ -7,6 +7,7 @@ import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, type ColaboradorLinha } from "../lib/dados";
 import { data, dataHora, hoje, type Tom } from "../lib/formato";
 import { useAuth } from "../auth/AuthProvider";
+import { GerarTermo } from "./Termos";
 import { AreaTexto, Aviso, Botao, CabecalhoPagina, Campo, Cartao, Carregando, EstadoErro, EstadoVazio, Modal, Selecao, Selo, Tabela, cx, useAvisos } from "../ui/componentes";
 
 /* ---------------- Tipos e dados ---------------- */
@@ -516,6 +517,7 @@ export function UniformesColaborador({ c }: { c: ColaboradorLinha }) {
   const posse = usePosse(c.id);
   const estoque = useEstoque();
   const [acao, setAcao] = useState<Acao>(null);
+  const [termo, setTermo] = useState<null | "nova" | "reimprimir">(null);
   const entrega = pode("uniforme.movimentar", c.loja_atual_id);
   const movimenta = pode("uniforme.estoque");
   const encerrado = c.status === "desligado" || c.status === "arquivado";
@@ -524,7 +526,8 @@ export function UniformesColaborador({ c }: { c: ColaboradorLinha }) {
     <div className="flex flex-col gap-6">
       <Cartao titulo={<span className="flex items-center gap-2"><Shirt className="size-4" /> Em mãos agora{total ? ` (${total})` : ""}</span>}
         acao={entrega && <div className="flex gap-2">
-          {!encerrado && <Botao tamanho="sm" icone={<ArrowUpFromLine className="size-4" />} onClick={() => setAcao({ tipo: "saida" })}>Entregar</Botao>}
+          {!encerrado && <Botao tamanho="sm" icone={<ArrowUpFromLine className="size-4" />} onClick={() => setTermo("nova")}>Entregar e gerar termo</Botao>}
+          {!encerrado && total > 0 && <Botao tamanho="sm" variante="secundaria" icone={<Printer className="size-4" />} onClick={() => setTermo("reimprimir")}>Reimprimir termo</Botao>}
           {total > 0 && <Botao tamanho="sm" variante="secundaria" icone={<Undo2 className="size-4" />} onClick={() => setAcao({ tipo: "devolucao" })}>Devolução</Botao>}
         </div>}>
         {posse.isLoading && <Carregando />}
@@ -544,6 +547,7 @@ export function UniformesColaborador({ c }: { c: ColaboradorLinha }) {
         {encerrado && total > 0 && <div className="mt-3"><Aviso tom="alerta">Colaborador desligado com peças em mãos. Registre a devolução ou a baixa.</Aviso></div>}
       </Cartao>
       <Movimentacoes movimenta={movimenta} setAcao={setAcao} colaborador={c.id} />
+      {termo && <GerarTermo c={c} tipoInicial="uniforme" reimprimir={termo === "reimprimir"} fechar={() => setTermo(null)} />}
       {acao && acao.tipo === "estorno" && <EstornoModal mov={acao.mov} fechar={() => setAcao(null)} />}
       {acao && (acao.tipo === "saida" || acao.tipo === "devolucao") &&
         <MovimentoModal tipo={acao.tipo} itens={ordenar(estoque.data ?? [])} colaboradorFixo={c} fechar={() => setAcao(null)} />}

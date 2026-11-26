@@ -34,7 +34,7 @@ const EPI_RE = /\bEPI\b|LUVA|ÓCULOS DE PROTE|OCULOS DE PROTE|AVENTAL|MÁSCARA|M
 /* ------------------------------------------------------------------ */
 /* Modal: escolher o termo, conferir os dados não pessoais e imprimir  */
 /* ------------------------------------------------------------------ */
-export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; tipoInicial?: TipoTermo; fechar: () => void }) {
+export function GerarTermo({ c, tipoInicial, reimprimir, fechar }: { c: ColaboradorLinha; tipoInicial?: TipoTermo; reimprimir?: boolean; fechar: () => void }) {
   const { pode } = useAuth();
   const loja = c.loja_atual_id;
   const [tipo, setTipo] = useState<TipoTermo | null>(tipoInicial ?? null);
@@ -75,7 +75,7 @@ export function GerarTermo({ c, tipoInicial, fechar }: { c: ColaboradorLinha; ti
   const [renovUni, setRenovUni] = useState<string>("");
   // nova entrega: as peças saem do estoque, ficam em posse do colaborador, concluem o item da admissão e vão para a linha do tempo
   const podeEntregar = pode("uniforme.movimentar", loja);
-  const [modoUni, setModoUni] = useState<"nova" | "reimprimir">(podeEntregar ? "nova" : "reimprimir");
+  const [modoUni, setModoUni] = useState<"nova" | "reimprimir">(podeEntregar && !reimprimir ? "nova" : "reimprimir");
   const [novas, setNovas] = useState<{ item_id: string; qtd: string; estado: string }[]>([{ item_id: "", qtd: "1", estado: "NOVO" }]);
   const [gravando, setGravando] = useState(false);
   const qc = useQueryClient(); const avisar = useAvisos();

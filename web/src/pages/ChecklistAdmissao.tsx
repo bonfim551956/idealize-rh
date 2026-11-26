@@ -17,7 +17,7 @@ export type ItemChecklist = {
 
 const ITENS: Record<ItemChecklist["item"], { rotulo: string; icone: LucideIcon; como: string }> = {
   cartao_vr:       { rotulo: "Entrega do cartão VR", icone: CreditCard, como: "Registre a data em que o cartão foi entregue." },
-  uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Conclui sozinho quando a entrega é lançada na aba Uniformes." },
+  uniforme:        { rotulo: "Entrega de uniforme", icone: Shirt, como: "Clique em “Entregar e gerar termo”: as peças saem do estoque, o termo é impresso e o item conclui sozinho." },
   cracha:          { rotulo: "Entrega de crachá", icone: IdCard, como: "Registre a data da entrega (ou lance o crachá na aba Equipamentos)." },
   termo_imagem:    { rotulo: "Termo de uso de imagem", icone: FileSignature, como: "Imprima o termo padrão, colha a assinatura e anexe o termo assinado." },
   equipamento_epi: { rotulo: "Entrega de equipamento / EPI", icone: HardHat, como: "Tem EPI ou equipamento para entregar? Se tiver, lance a entrega na aba Equipamentos. Se a função não usa, marque “Não tem”." },
@@ -147,8 +147,8 @@ export function ChecklistAdmissao({ c, irPara }: { c: ColaboradorLinha; irPara: 
                 {!it?.concluido && (k === "cartao_vr" || k === "cracha") && podeEntregar && (
                   <Botao tamanho="sm" onClick={() => setRegistrando(k)}>Registrar entrega</Botao>
                 )}
-                {!it?.concluido && k === "uniforme" && pode("uniforme.ler", loja) && (
-                  <Botao tamanho="sm" onClick={() => irPara("uniformes")}>Entregar uniforme</Botao>
+                {!it?.concluido && k === "uniforme" && pode("uniforme.movimentar", loja) && (
+                  <Botao tamanho="sm" icone={<Printer className="size-4" />} onClick={() => setTermo("uniforme")}>Entregar e gerar termo</Botao>
                 )}
                 {!it?.concluido && k === "equipamento_epi" && (
                   <>
