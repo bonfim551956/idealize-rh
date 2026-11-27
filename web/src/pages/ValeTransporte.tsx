@@ -178,13 +178,10 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
     const janela = window.open("", "_blank"); // abre já, senão o navegador bloqueia
     await carregarLogo();
     const nomeLoja = loja ? lojas.data?.find((x) => x.id === loja)?.nome ?? "" : "Todas as lojas";
-    const ant = nomeMes(mesAnterior(mes)).split(" ")[0];
     const linhasHtml = recebem.map((l) => `<tr>
       <td><b>${esc(l.nome)}</b><br><span class="s">${esc(l.loja)}${l.cargo ? ` · ${esc(l.cargo)}` : ""}${l.periodo_inicio !== `${mes}-01` ? ` · a partir de ${data(l.periodo_inicio)}` : ""}</span></td>
-      <td class="n">${moeda(l.valor_diario)}</td><td class="n">${l.dias_base}</td>
-      <td class="n">${l.dias_excluidos ? `−${l.dias_excluidos}` : "—"}</td>
-      <td class="n">${l.dias_desconto_anterior ? `−${l.dias_desconto_anterior}` : "—"}</td>
-      <td class="n"><b>${l.dias_pagar}</b>${l.ajuste_dias != null ? `<br><span class="s">ajuste manual (calc. ${l.dias_calculado})</span>` : ""}</td>
+      <td class="n">${moeda(l.valor_diario)}</td>
+      <td class="n"><b>${l.dias_pagar}</b></td>
       <td class="n"><b>${moeda(l.valor)}</b></td></tr>`).join("");
     const resumoLojas = porLoja.length > 1 ? `<p class="lojas">${porLoja.map(([l, v]) => `${esc(l.replace(/^ÓTICAS IDEALIZE /, ""))}: <b>${moeda(v)}</b>`).join(" &nbsp;·&nbsp; ")}</p>` : "";
     const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Vale-transporte ${esc(nomeMes(mes))}</title><style>
@@ -202,8 +199,8 @@ tr{page-break-inside:avoid}tfoot td{font-weight:bold;font-size:12px;border-top:2
 <div class="cards"><div class="card"><span>Total a pagar</span><b>${moeda(total)}</b></div><div class="card"><span>Recebem VT</span><b>${recebem.length}</b></div>
 <div class="card"><span>Sem cadastro de VT</span><b>${semCadastro.length}</b></div><div class="card"><span>Situação</span><b>${fechado ? "Fechado" : "Prévia"}</b></div></div>
 ${resumoLojas}
-<table><thead><tr><th>Colaborador</th><th class="n">R$/dia</th><th class="n">Dias do mês</th><th class="n">Férias/afast. no mês</th><th class="n">Desconto de ${esc(ant)}</th><th class="n">Dias a pagar</th><th class="n">Valor</th></tr></thead>
-<tbody>${linhasHtml}</tbody><tfoot><tr><td colspan="6">Total</td><td class="n">${moeda(total)}</td></tr></tfoot></table>
+<table><thead><tr><th>Colaborador</th><th class="n">R$/dia</th><th class="n">Dias a pagar</th><th class="n">Valor</th></tr></thead>
+<tbody>${linhasHtml}</tbody><tfoot><tr><td colspan="3">Total</td><td class="n">${moeda(total)}</td></tr></tfoot></table>
 ${semCadastro.length ? `<p class="rod">Sem cadastro de VT: ${semCadastro.map((x) => esc(x.nome)).join(", ")}.</p>` : ""}
 <script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
     imprimir(html, `Vale-transporte ${nomeMes(mes)}`, janela);
