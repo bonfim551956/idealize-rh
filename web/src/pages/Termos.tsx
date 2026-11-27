@@ -332,6 +332,7 @@ td.v{font-weight:bold}.vazio td{height:22px}ul{margin:4px 0 6px;padding-left:18p
 
 /* logo embutido no próprio termo (a janela de impressão não depende de carregar arquivo) */
 let logoDataUrl = "";
+export const logoAtual = () => logoDataUrl || `${location.origin}/logo.png`;
 export async function carregarLogo() {
   if (logoDataUrl) return;
   try {

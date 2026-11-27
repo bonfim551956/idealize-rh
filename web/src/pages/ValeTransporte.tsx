@@ -2,7 +2,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Tabs from "@radix-ui/react-tabs";
-import { Ban, CalendarX2, Download, Lock, Pencil, Plus } from "lucide-react";
+import { Ban, CalendarX2, Download, FileText, Lock, Pencil, Plus } from "lucide-react";
+import { carregarLogo, esc, imprimir, logoAtual } from "./Termos";
 import { mensagemErro, supabase } from "../lib/supabase";
 import { falhar, useLojas } from "../lib/dados";
 import { data, dataHora, type Tom } from "../lib/formato";
@@ -172,6 +173,42 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
     onError: (e) => avisar("erro", mensagemErro(e)),
   });
 
+  const lojas = useLojas();
+  const exportarPdf = async () => {
+    const janela = window.open("", "_blank"); // abre já, senão o navegador bloqueia
+    await carregarLogo();
+    const nomeLoja = loja ? lojas.data?.find((x) => x.id === loja)?.nome ?? "" : "Todas as lojas";
+    const ant = nomeMes(mesAnterior(mes)).split(" ")[0];
+    const linhasHtml = recebem.map((l) => `<tr>
+      <td><b>${esc(l.nome)}</b><br><span class="s">${esc(l.loja)}${l.cargo ? ` · ${esc(l.cargo)}` : ""}${l.periodo_inicio !== `${mes}-01` ? ` · a partir de ${data(l.periodo_inicio)}` : ""}</span></td>
+      <td class="n">${moeda(l.valor_diario)}</td><td class="n">${l.dias_base}</td>
+      <td class="n">${l.dias_excluidos ? `−${l.dias_excluidos}` : "—"}</td>
+      <td class="n">${l.dias_desconto_anterior ? `−${l.dias_desconto_anterior}` : "—"}</td>
+      <td class="n"><b>${l.dias_pagar}</b>${l.ajuste_dias != null ? `<br><span class="s">ajuste manual (calc. ${l.dias_calculado})</span>` : ""}</td>
+      <td class="n"><b>${moeda(l.valor)}</b></td></tr>`).join("");
+    const resumoLojas = porLoja.length > 1 ? `<p class="lojas">${porLoja.map(([l, v]) => `${esc(l.replace(/^ÓTICAS IDEALIZE /, ""))}: <b>${moeda(v)}</b>`).join(" &nbsp;·&nbsp; ")}</p>` : "";
+    const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Vale-transporte ${esc(nomeMes(mes))}</title><style>
+@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:11px;margin:0}
+.cab{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0F9CA3;padding-bottom:8px;margin-bottom:12px}.cab img{height:38px}
+h1{font-size:18px;margin:0 0 2px}.sub{color:#5c5c5c;margin:0 0 10px}.cards{display:flex;gap:10px;margin-bottom:10px}
+.card{flex:1;border:1px solid #e2e2e2;border-radius:6px;padding:8px 10px}.card span{display:block;font-size:10px;color:#5c5c5c}.card b{font-size:15px}
+.lojas{margin:0 0 10px}table{width:100%;border-collapse:collapse}th{background:#0F9CA3;color:#fafafa;text-align:left;font-size:10px;padding:6px;text-transform:uppercase}
+td{border-bottom:1px solid #e2e2e2;padding:6px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}.s{color:#5c5c5c;font-size:9.5px}
+tr{page-break-inside:avoid}tfoot td{font-weight:bold;font-size:12px;border-top:2px solid #1a1a1a}.rod{margin-top:12px;color:#5c5c5c;font-size:9.5px}
+</style></head><body>
+<div class="cab"><img src="${logoAtual()}" alt="Óticas Idealize"><span class="s">Gerado em ${new Date().toLocaleString("pt-BR")}</span></div>
+<h1>Vale-transporte · ${esc(nomeMes(mes))}</h1>
+<p class="sub">${esc(nomeLoja)} · VT pago antecipado: dias de segunda a sábado do mês, menos as faltas, atestados, afastamentos, licenças e férias do mês anterior.</p>
+<div class="cards"><div class="card"><span>Total a pagar</span><b>${moeda(total)}</b></div><div class="card"><span>Recebem VT</span><b>${recebem.length}</b></div>
+<div class="card"><span>Sem cadastro de VT</span><b>${semCadastro.length}</b></div><div class="card"><span>Situação</span><b>${fechado ? "Fechado" : "Prévia"}</b></div></div>
+${resumoLojas}
+<table><thead><tr><th>Colaborador</th><th class="n">R$/dia</th><th class="n">Dias do mês</th><th class="n">Férias/afast. no mês</th><th class="n">Desconto de ${esc(ant)}</th><th class="n">Dias a pagar</th><th class="n">Valor</th></tr></thead>
+<tbody>${linhasHtml}</tbody><tfoot><tr><td colspan="6">Total</td><td class="n">${moeda(total)}</td></tr></tfoot></table>
+${semCadastro.length ? `<p class="rod">Sem cadastro de VT: ${semCadastro.map((x) => esc(x.nome)).join(", ")}.</p>` : ""}
+<script>window.onload=()=>setTimeout(()=>window.print(),300)</script></body></html>`;
+    imprimir(html, `Vale-transporte ${nomeMes(mes)}`, janela);
+  };
+
   const exportar = () => {
     const cab = ["Loja", "Colaborador", "Cargo", "Valor diário", "Dias do mês", "Férias/afast. no mês", "Ausências mês anterior", "Já descontado", "Desconto", "Dias a pagar", "Valor"];
     const fmt = (n: number | null) => (n ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -188,6 +225,7 @@ function CalculoMes({ mes, setMes, loja }: { mes: string; setMes: (m: string) =>
         <Campo rotulo="Mês do pagamento" type="month" value={mes} onChange={(e) => e.target.value && setMes(e.target.value)} className="w-48" />
         <div className="flex flex-wrap gap-2">
           <Botao variante="secundaria" icone={<Download className="size-4" />} onClick={exportar} disabled={!recebem.length}>Exportar (Excel)</Botao>
+          <Botao variante="secundaria" icone={<FileText className="size-4" />} onClick={() => { void exportarPdf(); }} disabled={!recebem.length}>Exportar (PDF)</Botao>
           {pode("vt.gerir") && <Botao icone={<Lock className="size-4" />} onClick={() => setConfirmar(true)} disabled={!recebem.length}>
             {fechado ? "Refazer fechamento" : "Fechar mês"}</Botao>}
         </div>
